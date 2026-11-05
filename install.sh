@@ -26,7 +26,7 @@ while IFS= read -r l; do printf '\e[38;5;%sm%s\e[0m\n' "${pal[$((n++ % 18))]}" "
  ████    ▀███▄▄▄███▀      ██████      ▀███▄▄▄▄▄██    ████       ███▄▄▄▄████▀
  ▀▀▀▀       ▀▀▀▀▀▀         ▀▀▀▀▀         ▀▀▀▀▀▀▀     ▀▀▀▀        ▀▀▀▀▀▀▀▀
 ART
-printf '\n  %sEm4dloverS Tunnel%s  installer\n  %sChannel%s t.me/Em4dloverS   %sSupport%s %st.me/kamr4%s\n\n' "$W" "$N" "$R" "$N" "$R" "$N" "$D" "$N"
+printf '\n  %sEm4dloverS Tunnel%s  installer\n  %sChannel%s t.me/Em4dloverS   %sSupport%s %st.me/KaMr4ng%s\n\n' "$W" "$N" "$R" "$N" "$R" "$N" "$D" "$N"
 [ -n "${EMAD_TEST:-}" ] || [ "$(id -u)" = 0 ] || { echo "  Run as root:  sudo -i   then run the command again"; exit 1; }
 PCT=0; T0=$SECONDS
 draw(){ local p=$1 f=$(( $1 * 36 / 100 )); [ "$p" -gt "$PCT" ] && PCT=$p

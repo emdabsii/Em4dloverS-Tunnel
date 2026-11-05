@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Em4dloverS Tunnel - one-line installer  |  t.me/Em4dloverS
-REPO="${EMAD_REPO:-https://github.com/Em4dLoverS/Em4dloverS-Tunnel.git}"
+GH="${EMAD_GH:-emdabsii/Em4dloverS-Tunnel}"; BR="${EMAD_BRANCH:-main}"
+FILES="emad.sh panel/app.py"
 APP="${EMAD_DIR:-/opt/emadlovers}"
 R=$'\e[1;31m'; G=$'\e[1;32m'; W=$'\e[1;37m'; D=$'\e[2m'; N=$'\e[0m'
 pal=(52 88 124 160 196 196 160 124 88 52 88 124 160 196 196 160 124 88); n=0
@@ -37,26 +38,35 @@ run_creep(){ local a=$1 b=$2 msg=$3 p=$1 i=0; shift 3; "$@" >/tmp/emad_i.log 2>&
   while kill -0 $pid 2>/dev/null; do p=$(( p + (b - 1 - p) / 12 + (i++ % 3 == 0 ? 1 : 0) )); [ $p -ge $b ] && p=$((b-1)); draw $p "$msg  $((SECONDS-T0))s"; sleep 0.3; done
   wait $pid || fail "$msg failed" /tmp/emad_i.log; ok "$b" "$msg" "$msg"; }
 
-draw 2 "Checking system"; sleep 0.4
+draw 2 "Checking system"; sleep 0.3
 . /etc/os-release 2>/dev/null
 case "${ID:-}:${VERSION_ID:-}" in ubuntu:20.04|ubuntu:22.04|ubuntu:24.04|ubuntu:26.04|debian:11|debian:12|debian:13) ok 10 "${PRETTY_NAME}" "System supported: ${PRETTY_NAME}";;
   *) fail "Unsupported OS: ${PRETTY_NAME:-unknown} (Ubuntu 20.04/22.04/24.04/26.04 or Debian 11/12/13)";; esac
-export DEBIAN_FRONTEND=noninteractive
-if [ -z "${EMAD_TEST:-}" ]; then
-  run_creep 10 30 "Updating package index" apt-get update -qq
-  run_creep 30 42 "Installing git and curl" apt-get install -y -qq git curl ca-certificates
-fi
-# real percentage from git
-git_progress(){ local msg=$1 tmp=/tmp/emad_git.log p=0 q; shift; : >$tmp; "$@" --progress >$tmp 2>&1 & local pid=$!
-  while kill -0 $pid 2>/dev/null; do q=$(tr '\r' '\n' <$tmp | grep -oE '[0-9]+%' | tail -1 | tr -d %); [ -n "$q" ] && [ "$q" -gt "$p" ] && p=$q
-    draw $((42 + p * 50 / 100)) "$msg  $((SECONDS-T0))s"; sleep 0.15; done
-  wait $pid || fail "Could not download the project from GitHub. Check that the repository is Public and the link is correct." $tmp; ok 92 "$msg" "$msg"; }
-draw 42 "Connecting to GitHub"
-if [ -d "$APP/.git" ]; then git -C "$APP" config core.fileMode false; git -C "$APP" reset -q --hard; git -C "$APP" clean -fdq
-  git_progress "Downloading latest version" git -C "$APP" pull -q
-else rm -rf "$APP"; git_progress "Downloading project from GitHub" git clone -q --depth 1 "$REPO" "$APP"; git -C "$APP" config core.fileMode false; fi
-[ -f "$APP/emad.sh" ] && [ -f "$APP/panel/app.py" ] || fail "Project files are incomplete (emad.sh or panel/app.py missing in the repository)."
-draw 95 "Finishing"; chmod +x "$APP/emad.sh"
+# curl is the only requirement; no apt update (slow on some networks)
+if ! command -v curl >/dev/null; then
+  run_creep 10 25 "Installing curl" bash -c 'DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates || { apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl ca-certificates; }'
+else ok 25 "curl" "curl is already installed"; fi
+# download only the files that are needed, GitHub first and a mirror as backup
+SRC=("${EMAD_BASE:-https://raw.githubusercontent.com/$GH/$BR}" "https://cdn.jsdelivr.net/gh/$GH@$BR")
+NAMES=("GitHub" "jsDelivr mirror"); TMP=$(mktemp -d); nf=$(echo $FILES | wc -w); k=0
+for f in $FILES; do
+  base=$((25 + k * 65 / nf)); top=$((25 + (k + 1) * 65 / nf)); got=0; mkdir -p "$TMP/$(dirname $f)"
+  for si in 0 1; do
+    for try in 1 2; do
+      curl -fsSL --connect-timeout 8 --max-time 45 "${SRC[$si]}/$f" -o "$TMP/$f" 2>/tmp/emad_c.log &
+      pid=$!; p=$base
+      while kill -0 $pid 2>/dev/null; do p=$((p + (top - 1 - p) / 10 + 1)); [ $p -ge $top ] && p=$((top-1)); draw $p "$f via ${NAMES[$si]}  $((SECONDS-T0))s"; sleep 0.25; done
+      if wait $pid && [ -s "$TMP/$f" ]; then got=1; break 2; fi
+    done
+  done
+  [ $got = 1 ] || fail "Could not download $f from GitHub or the mirror. Check the repository name ($GH), that it is Public, and that the file exists." /tmp/emad_c.log
+  ok "$top" "$f" "Downloaded $f"; k=$((k+1))
+done
+[ -s "$TMP/emad.sh" ] && head -1 "$TMP/emad.sh" | grep -q '^#!' && python3 -m py_compile "$TMP/panel/app.py" 2>/dev/null || [ ! -x "$(command -v python3)" ] || fail "Downloaded files look damaged. Run the command again."
+draw 95 "Installing"; mkdir -p "$APP/panel"; cp "$TMP/emad.sh" "$APP/emad.sh"; cp "$TMP/panel/app.py" "$APP/panel/app.py"; chmod +x "$APP/emad.sh"; rm -rf "$TMP" "$APP/panel/__pycache__"
 [ -n "${EMAD_TEST:-}" ] || ln -sf "$APP/emad.sh" /usr/local/bin/emad
 ok 100 "Done in $((SECONDS-T0))s" "Installed. Starting the menu..."; sleep 1
-[ -n "${EMAD_TEST:-}" ] && exit 0; exec emad
+[ -n "${EMAD_TEST:-}" ] && exit 0
+# restart the panel so it runs the new code (login and port stay the same)
+systemctl is-active --quiet emad-panel 2>/dev/null && systemctl restart emad-panel
+exec emad

@@ -298,7 +298,9 @@ EOF
 # ---------- web panel ----------
 panel_cfg(){ python3 "$APP/panel/app.py" set "$@"; }
 panel_url(){ python3 "$APP/panel/app.py" url "$MYIP"; }
-panel_install(){ hdr "Install web panel"; STEPS=(); DONEN=0; TOTAL=4
+panel_install(){ hdr "Install web panel"
+  [ -f "$APP/panel/app.py" ] || { printf '  %s[!]%s File missing: %s/panel/app.py\n  Upload the "panel" folder (with app.py) to your GitHub repo, then run:\n  cd %s && git pull\n' "$R" "$N" "$APP" "$APP"; return; }
+  STEPS=(); DONEN=0; TOTAL=4
   step "Updating package index" apt_update
   step "Installing Python and Flask" apt_i python3 python3-flask curl
   local port pass; port=$(rand_port); pass=$(rand_str 12)
@@ -306,6 +308,7 @@ panel_install(){ hdr "Install web panel"; STEPS=(); DONEN=0; TOTAL=4
   printf '[Unit]\nDescription=Em4dloverS Panel\nAfter=network-online.target\n\n[Service]\nExecStart=/usr/bin/python3 %s/panel/app.py run\nRestart=always\n\n[Install]\nWantedBy=multi-user.target\n' "$APP" >"$UNITDIR/emad-panel.service"
   step "Starting panel service" bash -c "systemctl daemon-reload && systemctl enable --now emad-panel"
   command -v ufw >/dev/null && ufw allow "$port/tcp" >/dev/null 2>&1; summary
+  [ -f "$CONF/panel.json" ] && systemctl is-active --quiet emad-panel || { printf '\n  %s[!]%s Panel failed to start. See: journalctl -u emad-panel -n 30\n' "$R" "$N"; return; }
   printf '\n  %sPanel is ready.%s\n  Address : %s%s%s\n  Username: %sadmin%s\n  Password: %s%s%s\n' "$G" "$N" "$W" "$(panel_url)" "$N" "$W" "$N" "$W" "$pass" "$N"; }
 panel_ssl(){ hdr "Panel SSL (Let's Encrypt)"; [ -f "$CONF/panel.json" ] || { echo "  Install the panel first."; return; }
   ask "Domain (must point to $MYIP)"; local d=$REPLY; ask "Email for Let's Encrypt"; local m=$REPLY

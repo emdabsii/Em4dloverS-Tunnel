@@ -206,6 +206,18 @@ input:focus,select:focus,.btn:focus-visible,a:focus-visible{outline:2px solid va
 .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));border-top:1px solid var(--bk)}.kv div{padding:12px 14px 12px 0;border-bottom:1px solid var(--g2)}.kv small{display:block;color:var(--g3)}
 .seg{display:inline-flex;gap:3px}.seg i{width:16px;height:8px;background:var(--g2);border-radius:2px}.seg i.f{background:var(--ok)}.seg.y i.f{background:var(--wn)}.seg.r i.f{background:var(--rd)}
 footer{margin-top:50px;padding-top:18px;border-top:1px solid var(--g2);display:flex;gap:22px;flex-wrap:wrap;font-size:14px}footer a{text-decoration:none}footer .dim{color:var(--g3)}
+
+.cgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.cc{border:1px solid var(--g2);border-radius:16px;padding:16px 18px;transition:transform .2s,box-shadow .2s}.cc:hover{transform:translateY(-2px);box-shadow:0 10px 26px #0000001a}
+.cc.full{border-color:#12a15055}.cc.part{border-color:#e0a10055}.cc.no{border-color:#e1131f55;background:#fff7f7}
+.ctop{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.tick{width:34px;height:34px;display:inline-block;animation:bob 1.6s ease-in-out infinite}.tick svg{width:34px;height:34px}.tick circle{fill:#12a150}
+.tick path{fill:none;stroke:#fff;stroke-width:5;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:40;stroke-dashoffset:40;animation:draw .8s .2s forwards}
+@keyframes draw{to{stroke-dashoffset:0}}@keyframes bob{50%{transform:translateY(-4px)}}
+.cs{margin-top:10px;font-size:14px}.ok{color:#12a150;font-weight:600}.wn{color:#b98300;font-weight:600}.no-t{color:#e1131f;font-weight:600}
+.blink{animation:bl 1.1s steps(2,start) infinite}@keyframes bl{to{opacity:.35}}
+.logbox{background:#000;color:#d9d9d4;border-radius:14px;padding:14px 16px;font:12.5px/1.6 ui-monospace,Menlo,Consolas,monospace;height:240px;overflow:auto}
+.logbox .r{color:#ff5a63}.logbox .g{color:#4fd69a}.logbox .y{color:#f2c230}.logbox .d{color:#6b6b68}
 @media(max-width:900px){.shell{grid-template-columns:1fr}.rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;padding:14px}.rail nav{flex-direction:row;flex-wrap:wrap}.rail .sp,.rail .tg{display:none}
  main{padding:22px 16px 30px}.rings{grid-template-columns:1fr 1fr}.ringc:nth-child(2){border-right:0}.ringc:nth-child(-n+2){border-bottom:1px solid var(--g2)}.charts{grid-template-columns:1fr}table{display:block;overflow-x:auto}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
@@ -280,7 +292,7 @@ def live_block(name): return LIVE.replace("%NAME%", json.dumps(name))
 
 def page(name, body, msg=""): return render_template_string(BASE, page=name, body=body, msg=msg)
 def R(tpl, **k): return render_template_string(tpl, **k)
-def catalog(): return [l.split("|") for l in emad("catalog").splitlines() if l.count("|") == 2]
+def catalog(): return [l.split("|")[:4] for l in emad("catalog").splitlines() if l.count("|") >= 3]
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -322,6 +334,31 @@ def doact(n, a):
     ok = emad("act", a, n).startswith("OK")
     return redirect(("/tun" if a == "delete" else "/tun/" + n) + "?m=" + n + ": " + a + (" done" if ok else " failed"))
 
+
+@app.route("/api/log/<n>")
+def api_log(n):
+    if not tconf(n): abort(404)
+    out = sh("journalctl", "-u", "emad-" + n, "-n", "60", "--no-pager", "-o", "short-iso", t=8).strip().splitlines()
+    c = tconf(n); st, _ = conn_state(c, (HIST[n][-1]["rtt"] if n in HIST and HIST[n] else None))
+    lines = [{"t": "log", "m": l} for l in out[-60:]] or [{"t": "d", "m": "no log lines yet"}]
+    lines.append({"t": "d", "m": "state: %s, service: %s" % (st, svc(n))})
+    return jsonify(lines=lines)
+@app.route("/api/packets/<n>")
+def api_packets(n):
+    c = tconf(n)
+    if not c: abort(404)
+    i, _ = src_iface(c)
+    if not sh("sh", "-c", "command -v tcpdump"): return jsonify(lines=[{"t": "y", "m": "tcpdump is not installed. Run: apt-get install -y tcpdump"}])
+    o = sh("timeout", "2", "tcpdump", "-l", "-n", "-q", "-c", "25", "-i", i, t=6)
+    lines = []
+    for l in o.splitlines()[:25]:
+        t = "r" if ("unreach" in l or "RST" in l or "ICMP" in l) else "g"
+        lines.append({"t": t, "m": l[:160]})
+    return jsonify(lines=lines or [{"t": "d", "m": "no packets in the last 2 seconds on %s" % i}])
+@app.route("/api/tune", methods=["POST"])
+def api_tune():
+    r = emad("tune"); return jsonify(ok=r.startswith("OK"), out=r)
+
 @app.route("/tun/<n>")
 def tdetail(n):
     c = tconf(n) if n.replace("-", "").replace("_", "").isalnum() else None
@@ -337,7 +374,19 @@ function setS(s){const m={connected:['ok','Connected'],disconnected:['','Disconn
 window.onState=d=>setS(d.state);
 async function chk(){const b=$('chk');b.disabled=true;try{const d=await (await fetch('/api/check/{{c.NAME}}',{cache:'no-store'})).json();setS(d.state);$('k1').textContent=d.state;$('k2').textContent=d.detail;$('k3').textContent=d.rtt==null?'no reply':d.rtt+' ms';$('k4').textContent=d.loss+'%';$('k5').textContent=d.service}finally{b.disabled=false}}
 $('chk').onclick=chk;chk();
+let pk=false;
+function esc(t){return t.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+function paint(lines){const b=$('lg');b.innerHTML=lines.map(l=>'<div class="'+(l.t=='log'?'':l.t)+'">'+esc(l.m)+'</div>').join('');b.scrollTop=b.scrollHeight}
+async function loadLog(){try{paint((await (await fetch('/api/log/{{c.NAME}}',{cache:'no-store'})).json()).lines)}catch(e){}}
+async function pkts(){if(!pk)return;try{const d=await (await fetch('/api/packets/{{c.NAME}}',{cache:'no-store'})).json();paint(d.lines)}catch(e){}}
+async function tune(){const t=$('tuneb');t.disabled=true;$('tuner').textContent='optimizing...';try{const fd=new FormData();fd.append('t','{{csrf()}}');const d=await (await fetch('/api/tune',{method:'POST',body:fd})).json();$('tuner').textContent=d.ok?'done: '+d.out:'failed'}finally{t.disabled=false}}
+loadLog();setInterval(loadLog,4000);setInterval(pkts,2000);
 </script>
+<h2 class="serif">Live log and packets</h2>
+<div class="row" style="margin-bottom:10px"><button class="btn" onclick="pk=!pk;this.textContent=pk?'Pause packets':'Live packets'">Live packets</button><button class="btn" onclick="loadLog()">Refresh log</button></div>
+<div class="logbox" id="lg"></div>
+<h2 class="serif">Optimize this server</h2><p class="sub" style="margin-top:0">Applies BBR, buffers and the best MTU for each kernel tunnel on this server. Safe to run again.</p>
+<button class="btn red" id="tuneb" onclick="tune()">Optimize now</button> <span id="tuner" class="mono" style="margin-left:10px;color:var(--g3)"></span>
 <h2 class="serif">Edit tunnel</h2><p class="sub" style="margin-top:0">Saving restarts this tunnel. Apply the same changes on the other server. Type {{c.TYPE}}, role {{c.ROLE}} and ID {{c.IDX}} are fixed. Delete and recreate to change them.</p>
 <form method="post" action="/tun/{{c.NAME}}/edit" class="grid"><input type="hidden" name="t" value="{{csrf()}}">
 <div><label>Other server IP</label><input name="remote" value="{{c.REMOTE}}" required></div><div><label>This server IP</label><input name="local" value="{{c.LOCAL}}" required></div>
@@ -367,21 +416,25 @@ def new():
         msg = ("Result: " + r.splitlines()[-1]) if r else "No response from emad."
     body = R("""<h1 class="serif">New tunnel</h1><p class="sub">Run this form on both servers. Use the same ID, control port and token on each side.</p>
 <form method="post" class="grid"><input type="hidden" name="t" value="{{csrf()}}">
-<div><label>Tunnel type</label><select name="type">{% for c in cat %}<option value="{{c[0]}}">{{c[1]}} - {{c[2]}}</option>{% endfor %}</select></div>
+<div style="grid-column:1/-1"><label>Tunnel type (70 types, grouped)</label><select name="type" required>{% for g in groups %}<optgroup label="{{g}}">{% for c in cat if c[3]==g %}<option value="{{c[0]}}">{{c[1]}}  -  {{c[2]}}</option>{% endfor %}</optgroup>{% endfor %}</select></div>
 <div><label>Name</label><input name="name" pattern="[a-z0-9_-]{1,24}" placeholder="t1" required></div>
-<div><label>This server is</label><select id="rl" name="role"><option value="iran">Iran (entry): you enter ports here</option><option value="foreign">Foreign (exit): ports are set on the Iran side</option></select></div>
+<div><label>This server is</label><select id="rl" name="role"><option value="iran">ایران (ورودی، پورت‌ها اینجا)</option><option value="foreign">خارج (خروجی، پورت لازم نیست)</option></select></div>
 <div><label>This server IP</label><input name="local" value="{{ip}}" required></div><div><label>Other server IP</label><input name="remote" required></div>
 <div id="pw"><label>Ports (80,443,2000-2100)</label><input id="pi" name="ports" value="443"></div><div><label>Tunnel ID (1-250)</label><input name="idx" type="number" min="1" max="250" value="1" required></div>
 <div><label>Control port (proxy-based types)</label><input name="cport" type="number" value="33001"></div><div><label>Token (same on both)</label><input name="token" value="{{tok}}"></div>
 <div><label>WireGuard peer public key (optional)</label><input name="peer"></div>
-<div style="align-self:end"><button class="btn red" style="padding:12px 22px">Create and start</button></div></form><script>const rl=document.getElementById("rl"),pw=document.getElementById("pw");function sw(){pw.style.display=rl.value=="foreign"?"none":"";}rl.onchange=sw;sw();</script>""", cat=catalog(), ip=emad("ip"), tok=secrets.token_hex(8))
+<div style="align-self:end"><button class="btn red" style="padding:12px 22px">Create and start</button></div></form><script>const rl=document.getElementById("rl"),pw=document.getElementById("pw");function sw(){pw.style.display=rl.value=="foreign"?"none":"";}rl.onchange=sw;sw();</script>""", cat=catalog(), groups=sorted({c[3] for c in catalog()}), ip=emad("ip"), tok=secrets.token_hex(8))
     return page("new", body, msg)
 
 @app.route("/stat")
 def stat():
     rows = [l.split("|") for l in emad("status", t=120).splitlines() if l.count("|") == 2]
-    body = R("""<h1 class="serif">Compatibility</h1><p class="sub">How well each tunnel fits this server. 4 of 4 means everything it needs is available.</p>
-<table><tr><th>Tunnel</th><th>Fit</th><th></th></tr>{% for t,n,s in rows %}{% set s=s|int %}<tr><td>{{n}}</td><td><span class="seg {{'' if s==4 else 'y' if s==3 else 'r'}}">{% for i in range(4) %}<i class="{{'f' if i<s}}"></i>{% endfor %}</span></td><td>{{s}}/4</td></tr>{% endfor %}</table>""", rows=rows)
+    body = R("""<div class="top"><div><h1 class="serif">Compatibility</h1><p class="sub" style="margin:6px 0 0">Which tunnel types this server can run. 4 of 4 means fully supported.</p></div></div>
+<div class="cgrid">{% for t,n,s in rows %}{% set s=s|int %}
+<div class="cc {{'full' if s==4 else 'part' if s==3 else 'no'}}"><div class="ctop"><b>{{n}}</b>
+{% if s==4 %}<span class="tick"><svg viewBox="0 0 52 52"><circle cx="26" cy="26" r="24"/><path d="M14 27 l8 8 l16-17"/></svg></span>{% endif %}</div>
+<div class="seg {{'' if s==4 else 'y' if s==3 else 'r'}}">{% for i in range(4) %}<i class="{{'f' if i<s}}" style="animation-delay:{{i*90}}ms"></i>{% endfor %}</div>
+<div class="cs">{% if s==4 %}<span class="ok">OK for this tunnel ({{s}}/4)</span>{% elif s==3 %}<span class="wn">Partly supported ({{s}}/4)</span>{% else %}<span class="no-t blink">Tunnel does not fit this server ({{s}}/4)</span>{% endif %}</div></div>{% endfor %}</div>""", rows=rows)
     return page("stat", body)
 
 @app.route("/set", methods=["GET", "POST"])

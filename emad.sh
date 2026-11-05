@@ -381,6 +381,9 @@ net.ipv4.tcp_max_syn_backlog=16384
 EOF
   modprobe tcp_bbr 2>/dev/null; sysctl --system >/dev/null; }
 
+tune_all(){ optimize; local f n t i
+  for f in "$TUN"/*.conf; do [ -f "$f" ] || continue; ( . "$f"; case $TYPE in gre|gretap|ipip|vxlan|geneve|gre6|gre6tap|ipip6|*-fou|*-gue|wg*) ip link set "emad$IDX" mtu $([[ $TYPE == vxlan || $TYPE == geneve || $TYPE == gre6* || $TYPE == *-fou || $TYPE == *-gue || $TYPE == wg* ]] && echo 1380 || echo 1400) 2>/dev/null;; esac ); done
+  echo "OK BBR, buffers and MTU applied"; }
 # ---------- web panel ----------
 panel_cfg(){ python3 "$APP/panel/app.py" set "$@"; }
 panel_url(){ python3 "$APP/panel/app.py" url "$MYIP"; }
@@ -471,5 +474,6 @@ menu(){ while :; do banner
 if [ "${1:-}" = api ]; then shift; need_root; case ${1:-} in
   catalog) echo "$CATALOG";; list) list_tunnels;; status) status_table machine;; ip) myip; echo "$MYIP";; act) act "$2" "$3";;
   edit) shift; edit_tunnel "$@";;
+  tune) tune_all;;
   create) NAME=$2 TYPE=$3 ROLE=$4 LOCAL=$5 REMOTE=$6 PORTS=$7 CPORT=$8 TOKEN=$9 IDX=${10} PEER=${11:-}; create_tunnel;; esac; exit 0; fi
 need_root; detect_os; mkdir -p "$TUN" "$RUN" "$CFG" "$CONF/keys" "$ROOT/etc/sysctl.d" 2>/dev/null; menu

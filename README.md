@@ -11,7 +11,7 @@ Menu script plus a web panel. Channel: https://t.me/Em4dloverS  Support: https:/
 ## Install (one command, run as root on every server)
 
 ```bash
-bash <(curl -Ls https://raw.githubusercontent.com/Em4dLoverS/Em4dloverS-Tunnel/main/install.sh)
+bash <(curl -Ls https://raw.githubusercontent.com/emdabsii/Em4dloverS-Tunnel/main/install.sh)
 ```
 
 Run it later with:

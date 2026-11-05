@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Em4dloverS Tunnel Manager  |  t.me/Em4dloverS  |  support: t.me/kamr4
-VER="1.0.0"
+VER="1.1.0"
 ROOT="${EMAD_ROOT:-}"                       # test override only
 APP=/opt/emadlovers; CONF="$ROOT/etc/emadlovers"; TUN="$CONF/tunnels.d"; RUN="$CONF/run"; CFG="$CONF/cfg"
 LOG="${EMAD_LOG:-/var/log/emadlovers.log}"; UNITDIR="$ROOT/etc/systemd/system"
@@ -228,7 +228,7 @@ write_unit(){ local u="$UNITDIR/emad-$NAME.service"; mkdir -p "$UNITDIR"
 
 # ---------- tunnels ----------
 next_idx(){ local i; for i in $(seq 1 250); do grep -qs "^IDX=$i\$" "$TUN"/*.conf || { echo $i; return; }; done; }
-create_tunnel(){ local e; e=$(engine_of "$TYPE")
+check_fields(){ local e; e=$(engine_of "$TYPE")
   [[ $NAME =~ ^[a-z0-9_-]{1,24}$ ]] || { echo "ERR bad name"; return 1; }
   echo "$CATALOG" | cut -d'|' -f1 | grep -qx "$TYPE" && [ -n "$e" ] || { echo "ERR bad type"; return 1; }
   [ -n "$PORTS" ] || PORTS=1; valid_ports "$PORTS" || { echo "ERR bad ports"; return 1; }
@@ -239,17 +239,25 @@ create_tunnel(){ local e; e=$(engine_of "$TYPE")
   [[ ${TOKEN:-x} =~ ^[A-Za-z0-9]+$ ]] || { echo "ERR bad token"; return 1; }
   if [ "$ROLE" = iran ] || [[ $TYPE =~ ^(rathole|frp-.*|chisel)$ ]]; then
     local sp; sp=$(ssh_port); [ -n "$sp" ] && port_list | grep -qx "$sp" && { echo "ERR port $sp is your SSH port"; return 1; }
-    [ "$(port_list | wc -l)" -le 1000 ] || { echo "ERR max 1000 ports"; return 1; }; fi
+    [ "$(port_list | wc -l)" -le 1000 ] || { echo "ERR max 1000 ports"; return 1; }; fi; return 0; }
+write_conf(){ printf 'NAME=%s\nTYPE=%s\nROLE=%s\nLOCAL=%s\nREMOTE=%s\nPORTS=%s\nCPORT=%s\nTOKEN=%s\nIDX=%s\nPEER=%s\n' \
+    "$NAME" "$TYPE" "$ROLE" "$LOCAL" "$REMOTE" "$PORTS" "${CPORT:-}" "${TOKEN:-}" "$IDX" "${PEER:-}" >"$TUN/$NAME.conf"; chmod 600 "$TUN/$NAME.conf"; }
+create_tunnel(){ local e; e=$(engine_of "$TYPE"); check_fields || return 1
   [ -f "$TUN/$NAME.conf" ] && { echo "ERR name exists"; return 1; }
   mkdir -p "$TUN" "$RUN" "$CFG" "$CONF/keys"; chmod 700 "$CONF"
-  if [ -z "${EMAD_NOSYS:-}" ]; then command -v "$( [ $e = kernel ] && echo ip || echo "${e/wg/wg}" )" >/dev/null 2>&1 || install_engine "$e" >/dev/null 2>&1; fi
+  if [ -z "${EMAD_NOSYS:-}" ]; then command -v "$( [ $e = kernel ] && echo ip || echo "$e" )" >/dev/null 2>&1 || install_engine "$e" >/dev/null 2>&1; fi
   if [ "$TYPE" = wg ] && [ ! -f "$CONF/keys/$NAME.key" ]; then
     if [ -n "${EMAD_NOSYS:-}" ]; then echo k >"$CONF/keys/$NAME.key"; echo pub >"$CONF/keys/$NAME.pub"
     else (umask 077; wg genkey >"$CONF/keys/$NAME.key"); wg pubkey <"$CONF/keys/$NAME.key" >"$CONF/keys/$NAME.pub"; fi; fi
-  printf 'NAME=%s\nTYPE=%s\nROLE=%s\nLOCAL=%s\nREMOTE=%s\nPORTS=%s\nCPORT=%s\nTOKEN=%s\nIDX=%s\nPEER=%s\n' \
-    "$NAME" "$TYPE" "$ROLE" "$LOCAL" "$REMOTE" "$PORTS" "${CPORT:-}" "${TOKEN:-}" "$IDX" "${PEER:-}" >"$TUN/$NAME.conf"; chmod 600 "$TUN/$NAME.conf"
-  gen_run; write_unit; sysd daemon-reload; sysd enable "emad-$NAME" >/dev/null 2>&1; fw_open
+  write_conf; gen_run; write_unit; sysd daemon-reload; sysd enable "emad-$NAME" >/dev/null 2>&1; fw_open
   if [ "$TYPE" = wg ] && [ -z "${PEER:-}" ]; then echo "OK pending-peer"; else sysd restart "emad-$NAME" && echo OK || echo "ERR service failed to start"; fi; }
+edit_tunnel(){ local n=$1 kv k v; shift; [[ $n =~ ^[a-z0-9_-]+$ && -f "$TUN/$n.conf" ]] || { echo "ERR no such tunnel"; return 1; }
+  load "$n"
+  for kv in "$@"; do k=${kv%%=*}; v=${kv#*=}; case $k in local) LOCAL=$v;; remote) REMOTE=$v;; ports) PORTS=$v;; cport) CPORT=$v;; token) TOKEN=$v;; peer) PEER=$v;; esac; done
+  check_fields || return 1
+  sysd stop "emad-$n" >/dev/null 2>&1                      # old script removes the old firewall rules
+  write_conf; gen_run; write_unit; sysd daemon-reload; fw_open
+  sysd restart "emad-$n" && echo OK || echo "ERR service failed to start"; }
 load(){ NAME=$1; PEER=; . "$TUN/$1.conf" 2>/dev/null; }
 act(){ [[ $2 =~ ^[a-z0-9_-]+$ && -f "$TUN/$2.conf" ]] || { echo "ERR no such tunnel"; return 1; }
   case $1 in start|stop|restart) sysd "$1" "emad-$2" && echo OK || echo ERR;;
@@ -298,18 +306,30 @@ EOF
 # ---------- web panel ----------
 panel_cfg(){ python3 "$APP/panel/app.py" set "$@"; }
 panel_url(){ python3 "$APP/panel/app.py" url "$MYIP"; }
+panel_state(){ systemctl is-active emad-panel 2>/dev/null || echo inactive; }
 panel_install(){ hdr "Install web panel"
-  [ -f "$APP/panel/app.py" ] || { printf '  %s[!]%s File missing: %s/panel/app.py\n  Upload the "panel" folder (with app.py) to your GitHub repo, then run:\n  cd %s && git pull\n' "$R" "$N" "$APP" "$APP"; return; }
+  [ -f "$APP/panel/app.py" ] || { printf '  %s[!]%s File missing: %s/panel/app.py\n  Re-run the installer from GitHub.\n' "$R" "$N" "$APP"; return; }
+  local fresh=1 port pass; [ -f "$CONF/panel.json" ] && fresh=0
   STEPS=(); DONEN=0; TOTAL=4
-  step "Updating package index" apt_update
   step "Installing Python and Flask" apt_i python3 python3-flask curl
-  local port pass; port=$(rand_port); pass=$(rand_str 12)
-  step "Creating panel configuration" panel_cfg "port=$port" "user=admin" "pass=$pass"
+  if [ $fresh = 1 ]; then port=$(rand_port); pass=$(rand_str 12); step "Creating panel configuration" panel_cfg "port=$port" "user=admin" "pass=$pass"
+  else port=$(python3 "$APP/panel/app.py" get port); step "Keeping existing configuration" true; fi
   printf '[Unit]\nDescription=Em4dloverS Panel\nAfter=network-online.target\n\n[Service]\nExecStart=/usr/bin/python3 %s/panel/app.py run\nRestart=always\n\n[Install]\nWantedBy=multi-user.target\n' "$APP" >"$UNITDIR/emad-panel.service"
-  step "Starting panel service" bash -c "systemctl daemon-reload && systemctl enable --now emad-panel"
+  step "Writing service file" true
+  step "Starting panel service" bash -c "systemctl daemon-reload && systemctl enable emad-panel && systemctl restart emad-panel"
   command -v ufw >/dev/null && ufw allow "$port/tcp" >/dev/null 2>&1; summary
-  [ -f "$CONF/panel.json" ] && systemctl is-active --quiet emad-panel || { printf '\n  %s[!]%s Panel failed to start. See: journalctl -u emad-panel -n 30\n' "$R" "$N"; return; }
-  printf '\n  %sPanel is ready.%s\n  Address : %s%s%s\n  Username: %sadmin%s\n  Password: %s%s%s\n' "$G" "$N" "$W" "$(panel_url)" "$N" "$W" "$N" "$W" "$pass" "$N"; }
+  [ "$(panel_state)" = active ] || { printf '\n  %s[!]%s Panel failed to start. See: journalctl -u emad-panel -n 30\n' "$R" "$N"; return; }
+  if [ $fresh = 1 ]; then printf '\n  %sPanel is ready.%s\n  Address : %s%s%s\n  Username: %sadmin%s\n  Password: %s%s%s\n' "$G" "$N" "$W" "$(panel_url)" "$N" "$W" "$N" "$W" "$pass" "$N"
+  else printf '\n  %sPanel repaired. Login unchanged.%s  Address: %s%s%s\n' "$G" "$N" "$W" "$(panel_url)" "$N"; fi; }
+panel_menu(){ [ -f "$CONF/panel.json" ] || { panel_install; return; }
+  while :; do local st c=$R; st=$(panel_state); [ "$st" = active ] && c=$G; myip; hdr "Web panel"
+    printf '  Status   : %s%s%s\n  Address  : %s%s%s\n  Username : %s%s%s\n  Password : %shidden (use 4 or 5 to set a new one)%s\n\n' "$c" "$st" "$N" "$W" "$(panel_url)" "$N" "$W" "$(python3 "$APP/panel/app.py" get user)" "$N" "$D" "$N"
+    printf '  %s[1]%s Restart   %s[2]%s Stop   %s[3]%s Start   %s[4]%s Change username/password\n  %s[5]%s New random password   %s[6]%s Change port   %s[7]%s Repair   %s[8]%s Uninstall   %s[0]%s Back\n\n' $R $N $R $N $R $N $R $N $R $N $R $N $R $N $R $N $R $N
+    ask "Select" 0; case $REPLY in 1) systemctl restart emad-panel;; 2) systemctl stop emad-panel;; 3) systemctl start emad-panel;; 4) panel_reset; pause;;
+      5) local p; p=$(rand_str 12); panel_cfg "pass=$p" && systemctl restart emad-panel; printf '\n  New password: %s%s%s\n' "$W" "$p" "$N"; pause;;
+      6) ask "New port (Enter = random free)"; local np=${REPLY:-$(rand_port)}; [[ $np =~ ^[0-9]{2,5}$ ]] && port_free "$np" && panel_cfg "port=$np" && { command -v ufw >/dev/null && ufw allow "$np/tcp" >/dev/null 2>&1; systemctl restart emad-panel; echo "  Port is now $np"; } || echo "  Port invalid or busy."; pause;;
+      7) panel_install; pause;; 8) ask "Type YES to uninstall the panel" no; [ "$REPLY" = YES ] && { systemctl disable --now emad-panel; rm -f "$UNITDIR/emad-panel.service" "$CONF/panel.json"; systemctl daemon-reload; echo "  Panel removed."; pause; return; };;
+      *) return;; esac; done; }
 panel_ssl(){ hdr "Panel SSL (Let's Encrypt)"; [ -f "$CONF/panel.json" ] || { echo "  Install the panel first."; return; }
   ask "Domain (must point to $MYIP)"; local d=$REPLY; ask "Email for Let's Encrypt"; local m=$REPLY
   [[ $d =~ ^[A-Za-z0-9.-]+$ && $m =~ ^[^@\ ]+@[^@\ ]+$ ]] || { echo "  Invalid domain or email."; return; }
@@ -342,13 +362,21 @@ wizard(){ local again=y; while [ "$again" = y ]; do
   echo; install_engine "$e"; local out; out=$(create_tunnel); printf '\n  Result: %s%s%s\n' "$W" "$out" "$N"
   [ "$TYPE" = wg ] && printf '  Your public key: %s%s%s\n' "$W" "$(cat "$CONF/keys/$NAME.pub" 2>/dev/null)" "$N"
   ask "Add another tunnel / server? (y/n)" n; again=$REPLY; done; }
+edit_menu(){ load "$1"; hdr "Edit $1  ($TYPE, $ROLE)"; local a=()
+  ask "Other server IP" "$REMOTE"; [ "$REPLY" != "$REMOTE" ] && a+=("remote=$REPLY")
+  ask "This server IP" "$LOCAL"; [ "$REPLY" != "$LOCAL" ] && a+=("local=$REPLY")
+  if [ "$PORTS" != 1 ]; then ask "Ports (add or remove, e.g. 80,443,2000-2100)" "$PORTS"; [ "$REPLY" != "$PORTS" ] && a+=("ports=$REPLY"); fi
+  if [ -n "$CPORT" ]; then ask "Control port" "$CPORT"; [ "$REPLY" != "$CPORT" ] && a+=("cport=$REPLY"); ask "Token" "$TOKEN"; [ "$REPLY" != "$TOKEN" ] && a+=("token=$REPLY"); fi
+  [ ${#a[@]} -eq 0 ] && { echo "  Nothing changed."; return; }
+  printf '  Result: %s%s%s\n  %sRemember to apply the same IP, port, control port and token changes on the other server.%s\n' "$W" "$(edit_tunnel "$1" "${a[@]}")" "$N" "$D" "$N"; }
 manage(){ while :; do hdr "Tunnels"; local i=0 line names=()
   while IFS='|' read -r n t r rem p s; do [ -n "$n" ] || continue; i=$((i+1)); names+=("$n"); local c=$R; [ "$s" = active ] && c=$G
     printf '  %s%2d%s  %-14s %-16s %-8s %s -> %s  %s%s%s\n' "$R" "$i" "$N" "$n" "$(type_name "$t")" "$r" "${p:0:18}" "$rem" "$c" "$s" "$N"; done < <(list_tunnels)
   [ $i -eq 0 ] && { echo "  No tunnels yet."; pause; return; }
   ask "Select number (0 = back)" 0; [ "$REPLY" = 0 ] && return; local n=${names[$((REPLY-1))]:-}; [ -n "$n" ] || continue
-  printf '  %ss%s start  %sx%s stop  %sr%s restart  %sl%s logs  %sk%s set WG peer key  %sd%s delete\n' "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N"
+  printf '  %ss%s start  %sx%s stop  %sr%s restart  %se%s edit  %sl%s logs  %sk%s WG peer key  %sd%s delete\n' "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N"
   ask "Action"; case $REPLY in s) act start "$n";; x) act stop "$n";; r) act restart "$n";; d) ask "Type YES to delete" no; [ "$REPLY" = YES ] && act delete "$n";;
+   e) edit_menu "$n"; pause;;
    l) journalctl -u "emad-$n" -n 40 --no-pager; pause;;
    k) load "$n"; ask "Peer public key"; sed -i "s|^PEER=.*|PEER=$REPLY|" "$TUN/$n.conf"; load "$n"; gen_run; sysd restart "emad-$n" && echo "  Done.";; esac; done; }
 install_menu(){ hdr "Install requirements"; local e i=0 list=(kernel wg socat haproxy gost rathole backhaul frp chisel all)
@@ -356,13 +384,14 @@ install_menu(){ hdr "Install requirements"; local e i=0 list=(kernel wg socat ha
   if [ "$e" = all ]; then for e in "${list[@]:0:9}"; do hdr "Installing: $e"; install_engine "$e"; done; else install_engine "$e"; fi; }
 support(){ hdr "Contact"; printf '  Channel : %st.me/Em4dloverS%s\n  Support : %st.me/kamr4%s\n' "$W" "$N" "$D" "$N"; }
 menu(){ while :; do banner
-  printf '\n  %s[1]%s Install requirements        %s[6]%s Install web panel\n  %s[2]%s Create tunnel (wizard)       %s[7]%s Panel SSL (domain)\n  %s[3]%s Manage tunnels               %s[8]%s Reset panel login\n  %s[4]%s Tunnel Status (this server)  %s[9]%s Contact / Telegram\n  %s[5]%s Optimize network (BBR)       %s[0]%s Exit\n\n' \
+  printf '\n  %s[1]%s Install requirements        %s[6]%s Web panel (status/manage)\n  %s[2]%s Create tunnel (wizard)       %s[7]%s Panel SSL (domain)\n  %s[3]%s Manage tunnels               %s[8]%s Reset panel login\n  %s[4]%s Tunnel Status (this server)  %s[9]%s Contact / Telegram\n  %s[5]%s Optimize network (BBR)       %s[0]%s Exit\n\n' \
     $R $N $R $N $R $N $R $N $R $N $R $N $R $N $R $N $R $N $R $N
   ask "Select"; case $REPLY in 1) install_menu;; 2) wizard;; 3) manage; continue;; 4) hdr "Tunnel Status"; status_table;; 5) hdr "Optimizer"; optimize && echo "  BBR, fq and buffers applied.";;
-    6) panel_install;; 7) panel_ssl;; 8) panel_reset;; 9) support;; 0) printf '\n  %sBye. t.me/Em4dloverS%s\n\n' "$R" "$N"; exit 0;; *) continue;; esac; pause; done; }
+    6) panel_menu; continue;; 7) panel_ssl;; 8) panel_reset;; 9) support;; 0) printf '\n  %sBye. t.me/Em4dloverS%s\n\n' "$R" "$N"; exit 0;; *) continue;; esac; pause; done; }
 
 # ---------- entry ----------
 if [ "${1:-}" = api ]; then shift; need_root; case ${1:-} in
   catalog) echo "$CATALOG";; list) list_tunnels;; status) status_table machine;; ip) myip; echo "$MYIP";; act) act "$2" "$3";;
+  edit) shift; edit_tunnel "$@";;
   create) NAME=$2 TYPE=$3 ROLE=$4 LOCAL=$5 REMOTE=$6 PORTS=$7 CPORT=$8 TOKEN=$9 IDX=${10} PEER=${11:-}; create_tunnel;; esac; exit 0; fi
 need_root; detect_os; mkdir -p "$TUN" "$RUN" "$CFG" "$CONF/keys" "$ROOT/etc/sysctl.d" 2>/dev/null; menu

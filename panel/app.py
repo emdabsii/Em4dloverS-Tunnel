@@ -216,10 +216,10 @@ BASE = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name=
 <nav>{% for k,l,i in [('dash','Overview','dash'),('tun','Tunnels','tun'),('new','New tunnel','new'),('stat','Compatibility','stat'),('set','Settings','set')] %}
 <a href="/{{'' if k=='dash' else k}}" class="{{'on' if page==k}}">{{ico(i)}}<span>{{l}}</span></a>{% endfor %}</nav><div class="sp"></div>
 <a class="tg" href="https://t.me/Em4dloverS" target="_blank" rel="noopener">{{ico('tg')}}Channel  t.me/Em4dloverS</a>
-<a class="tg dim" href="https://t.me/kamr4" target="_blank" rel="noopener">{{ico('tg')}}Support  t.me/kamr4</a>
+<a class="tg dim" href="https://t.me/KaMr4ng" target="_blank" rel="noopener">{{ico('tg')}}Support  t.me/KaMr4ng</a>
 <form method="post" action="/logout"><input type="hidden" name="t" value="{{csrf()}}"><button class="btn sm" style="width:100%;justify-content:center">Sign out</button></form></aside>
 <main>{% if msg %}<div class="note">{{msg}}</div>{% endif %}{{body|safe}}
-<footer><a href="https://t.me/Em4dloverS" target="_blank" rel="noopener">Channel  t.me/Em4dloverS</a><a class="dim" href="https://t.me/kamr4" target="_blank" rel="noopener">Support  t.me/kamr4</a></footer></main></div></body></html>"""
+<footer><a href="https://t.me/Em4dloverS" target="_blank" rel="noopener">Channel  t.me/Em4dloverS</a><a class="dim" href="https://t.me/KaMr4ng" target="_blank" rel="noopener">Support  t.me/KaMr4ng</a></footer></main></div></body></html>"""
 LOGIN = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in</title><link rel="icon" href="{{LOGO}}">
 <style>""" + CSS + """
 body{background:#000;color:#fff;min-height:100vh;display:grid;grid-template-columns:1.1fr 1fr}
@@ -237,25 +237,25 @@ body{background:#000;color:#fff;min-height:100vh;display:grid;grid-template-colu
 <div><label for="u">Username</label><input id="u" name="u" autocomplete="username" required autofocus></div>
 <div><label for="p">Password</label><input id="p" name="p" type="password" autocomplete="current-password" required></div>
 <button class="btn red" style="padding:12px;justify-content:center">Sign in</button></form>
-<div class="lk"><a href="https://t.me/Em4dloverS" target="_blank" rel="noopener">t.me/Em4dloverS</a><a class="dim" href="https://t.me/kamr4" target="_blank" rel="noopener">t.me/kamr4</a></div></section></body></html>"""
+<div class="lk"><a href="https://t.me/Em4dloverS" target="_blank" rel="noopener">t.me/Em4dloverS</a><a class="dim" href="https://t.me/KaMr4ng" target="_blank" rel="noopener">t.me/KaMr4ng</a></div></section></body></html>"""
 
 LIVE = """
 <div class="rings">
  <div class="ringc"><div class="ring"><svg viewBox="0 0 140 140"><circle class="tr" cx="70" cy="70" r="60"/><circle class="fg" id="r1" cx="70" cy="70" r="60"/></svg><div class="v"><b id="v1">-</b><small>ms</small></div></div><div class="l">Latency</div><div class="s" id="s1">between the two servers</div></div>
  <div class="ringc"><div class="ring"><svg viewBox="0 0 140 140"><circle class="tr" cx="70" cy="70" r="60"/><circle class="fg" id="r2" cx="70" cy="70" r="60"/></svg><div class="v"><b id="v2">-</b><small>quality</small></div></div><div class="l">Link quality</div><div class="s" id="s2">packet loss -</div></div>
- <div class="ringc"><div class="ring"><svg viewBox="0 0 140 140"><circle class="tr" cx="70" cy="70" r="60"/><circle class="fg" id="r3" cx="70" cy="70" r="60"/></svg><div class="v"><b id="v3">-</b><small id="u3">Mbit/s</small></div></div><div class="l">Traffic now</div><div class="s" id="s3">-</div></div>
+ <div class="ringc"><div class="ring"><svg viewBox="0 0 140 140"><circle class="tr" cx="70" cy="70" r="60"/><circle class="fg" id="r3" cx="70" cy="70" r="60"/></svg><div class="v"><b id="v3">-</b><small id="u3">MB/s</small></div></div><div class="l">Traffic now</div><div class="s" id="s3">-</div></div>
  <div class="ringc"><div class="ring"><svg viewBox="0 0 140 140"><circle class="tr" cx="70" cy="70" r="60"/><circle class="fg" id="r4" cx="70" cy="70" r="60"/></svg><div class="v"><b id="v4">-</b><small id="u4">uptime</small></div></div><div class="l">Tunnel uptime</div><div class="s" id="s4">-</div></div>
 </div>
 <h2 class="serif">Live charts</h2>
 <div class="charts">
- <div class="chart"><header><span><b>Throughput</b> <span class="lg"><i style="background:#e1131f"></i>Upload<i style="background:#fff"></i>Download</span></span><span id="ct1">-</span></header><canvas id="c1"></canvas></div>
+ <div class="chart"><header><span><b>Throughput</b> (MB/s) <span class="lg"><i style="background:#e1131f"></i>Upload<i style="background:#fff"></i>Download</span></span><span id="ct1">-</span></header><canvas id="c1"></canvas></div>
  <div class="chart"><header><span><b>Latency</b> (ms)</span><span id="ct2">-</span></header><canvas id="c2"></canvas></div>
  <div class="chart wide"><header><span><b>Packet loss</b> (%)</span><span id="ct3">-</span></header><canvas id="c3" style="height:130px"></canvas></div>
 </div>
 <script>
 const NAME=%NAME%;const $=s=>document.getElementById(s);
-const fb=b=>b<1024?b.toFixed(0)+' B':b<1048576?(b/1024).toFixed(1)+' KB':b<1073741824?(b/1048576).toFixed(1)+' MB':(b/1073741824).toFixed(2)+' GB';
-const fm=b=>(b*8/1e6).toFixed(b*8/1e6<10?2:1);
+const fb=b=>b<1024?b.toFixed(0)+' B':b<1048576?(b/1024).toFixed(1)+' KB':b<1073741824?(b/1048576).toFixed(1)+' MB':b<1099511627776?(b/1073741824).toFixed(2)+' GB':(b/1099511627776).toFixed(2)+' TB';
+const fm=b=>(b/1048576).toFixed(b/1048576<10?2:1);
 function ring(id,f,c){const e=$(id);e.style.strokeDashoffset=377*(1-Math.max(0,Math.min(1,f)));e.style.stroke=c}
 function chart(cv,sets,o){const dpr=devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*dpr;cv.height=h*dpr;const x=cv.getContext('2d');x.scale(dpr,dpr);
  let n=Math.max(...sets.map(s=>s.d.length),2),mx=o.max||Math.max(1e-9,...sets.flatMap(s=>s.d.filter(v=>v!=null)))*1.15;x.strokeStyle='#222';x.fillStyle='#777';x.font='11px system-ui';x.lineWidth=1;
@@ -268,10 +268,10 @@ async function tick(){let d;try{d=await (await fetch('/api/live?name='+encodeURI
  const rt=d.rtt;$('v1').textContent=rt==null?'-':rt.toFixed(rt<10?1:0);ring('r1',rt==null?0:1-Math.min(rt,300)/300,rt==null?'#85857f':rt<80?'#12a150':rt<160?'#e0a100':'#e1131f');
  $('s1').textContent=rt==null?'no reply':rt<80?'excellent':rt<160?'good':'high';
  const q=100-d.loss;$('v2').textContent=q.toFixed(1)+'%';ring('r2',q/100,q>=99?'#12a150':q>=95?'#e0a100':'#e1131f');$('s2').textContent='packet loss '+d.loss.toFixed(1)+'%';
- const tot=d.up+d.down;$('v3').textContent=fm(tot);ring('r3',Math.min(1,tot*8/1e6/100),'#e1131f');$('s3').textContent='up '+fm(d.up)+'  down '+fm(d.down)+' Mbit/s';
+ const tot=d.up+d.down;$('v3').textContent=fm(tot);ring('r3',Math.min(1,tot/104857600),'#e1131f');$('u3').textContent='MB/s';$('s3').textContent='up '+fm(d.up)+'  down '+fm(d.down)+' MB/s';
  const t=d.uptime,days=Math.floor(t/86400);$('v4').textContent=days>0?days+'d':Math.floor(t/3600)+'h';$('u4').textContent=days>0?Math.floor(t%86400/3600)+'h '+Math.floor(t%3600/60)+'m':Math.floor(t%3600/60)+'m';ring('r4',Math.min(1,t/2592000),d.state=='connected'?'#12a150':'#85857f');
- $('s4').textContent='total '+fb(d.tot_up+d.tot_down)+' ('+d.src+')';
- const s=d.series;chart($('c1'),[{d:s.down,c:'#ffffff'},{d:s.up,c:'#e1131f',fill:1}],{fmt:v=>fm(v)+' Mbit'});$('ct1').textContent='up '+fb(d.tot_up)+'  down '+fb(d.tot_down);
+ $('s4').textContent='total traffic '+fb(d.tot_up+d.tot_down)+' ('+d.src+')';
+ const s=d.series;chart($('c1'),[{d:s.down,c:'#ffffff'},{d:s.up,c:'#e1131f',fill:1}],{fmt:v=>fm(v)+' MB/s'});$('ct1').textContent='up '+fb(d.tot_up)+'  down '+fb(d.tot_down);
  chart($('c2'),[{d:s.rtt,c:'#ffffff',fill:1}],{fmt:v=>v.toFixed(0)+' ms'});$('ct2').textContent=rt==null?'no reply':rt.toFixed(1)+' ms';
  chart($('c3'),[{d:s.loss,c:'#e1131f',fill:1}],{max:Math.max(5,...s.loss),fmt:v=>v.toFixed(0)+'%'});$('ct3').textContent=d.loss.toFixed(1)+'% now'}
 tick();setInterval(tick,2000);addEventListener('resize',tick);
@@ -369,12 +369,12 @@ def new():
 <form method="post" class="grid"><input type="hidden" name="t" value="{{csrf()}}">
 <div><label>Tunnel type</label><select name="type">{% for c in cat %}<option value="{{c[0]}}">{{c[1]}} - {{c[2]}}</option>{% endfor %}</select></div>
 <div><label>Name</label><input name="name" pattern="[a-z0-9_-]{1,24}" placeholder="t1" required></div>
-<div><label>This server is</label><select name="role"><option value="iran">Iran (entry)</option><option value="foreign">Foreign (exit)</option></select></div>
+<div><label>This server is</label><select id="rl" name="role"><option value="iran">Iran (entry): you enter ports here</option><option value="foreign">Foreign (exit): ports are set on the Iran side</option></select></div>
 <div><label>This server IP</label><input name="local" value="{{ip}}" required></div><div><label>Other server IP</label><input name="remote" required></div>
-<div><label>Ports (80,443,2000-2100)</label><input name="ports" value="443"></div><div><label>Tunnel ID (1-250)</label><input name="idx" type="number" min="1" max="250" value="1" required></div>
+<div id="pw"><label>Ports (80,443,2000-2100)</label><input id="pi" name="ports" value="443"></div><div><label>Tunnel ID (1-250)</label><input name="idx" type="number" min="1" max="250" value="1" required></div>
 <div><label>Control port (proxy-based types)</label><input name="cport" type="number" value="33001"></div><div><label>Token (same on both)</label><input name="token" value="{{tok}}"></div>
 <div><label>WireGuard peer public key (optional)</label><input name="peer"></div>
-<div style="align-self:end"><button class="btn red" style="padding:12px 22px">Create and start</button></div></form>""", cat=catalog(), ip=emad("ip"), tok=secrets.token_hex(8))
+<div style="align-self:end"><button class="btn red" style="padding:12px 22px">Create and start</button></div></form><script>const rl=document.getElementById("rl"),pw=document.getElementById("pw");function sw(){pw.style.display=rl.value=="foreign"?"none":"";}rl.onchange=sw;sw();</script>""", cat=catalog(), ip=emad("ip"), tok=secrets.token_hex(8))
     return page("new", body, msg)
 
 @app.route("/stat")

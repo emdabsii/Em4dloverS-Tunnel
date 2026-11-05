@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Em4dloverS Tunnel Manager  |  t.me/Em4dloverS  |  support: t.me/kamr4
+# Em4dloverS Tunnel Manager  |  t.me/Em4dloverS  |  support: t.me/KaMr4ng
 VER="1.1.0"
 ROOT="${EMAD_ROOT:-}"                       # test override only
 APP=/opt/emadlovers; CONF="$ROOT/etc/emadlovers"; TUN="$CONF/tunnels.d"; RUN="$CONF/run"; CFG="$CONF/cfg"
@@ -12,44 +12,80 @@ ARCH_G=$(case $(uname -m) in x86_64) echo amd64;; aarch64) echo arm64;; *) echo 
 ARCH_X=$(uname -m)
 
 # ---------- catalog: type|name|description ----------
-CATALOG='gre|GRE|Kernel L3 tunnel, lowest latency
-gretap|GRE-TAP|Kernel L2 tunnel over GRE
-ipip|IPIP|Lightest kernel tunnel (one per IP pair)
-vxlan|VXLAN|Kernel UDP-encapsulated L2 tunnel
-gre6|GRE6 (ip6gre)|GRE over IPv6 endpoints
-ipip6|IPIP6 (ip6tnl)|IPv4-in-IPv6 kernel tunnel
-wg|WireGuard|Encrypted UDP tunnel, fast and modern
-dnat|Direct DNAT|iptables port forward (no encryption)
-socat-tcp|Socat TCP|Simple TCP relay
-socat-udp|Socat UDP|Simple UDP relay
-haproxy|HAProxy TCP|L4 forward, port ranges
-gost-tcp|GOST relay|GOST relay over plain TCP
-gost-tls|GOST relay+TLS|GOST relay over TLS
-gost-mtls|GOST relay+MTLS|GOST relay over multiplexed TLS
-gost-ws|GOST relay+WS|GOST relay over WebSocket
-gost-mws|GOST relay+MWS|GOST relay over multiplexed WS
-gost-wss|GOST relay+WSS|GOST relay over secure WebSocket
-gost-mwss|GOST relay+MWSS|GOST relay over multiplexed WSS
-gost-h2|GOST relay+H2|GOST relay over HTTP/2 TLS
-gost-h2c|GOST relay+H2C|GOST relay over HTTP/2 cleartext
-gost-quic|GOST relay+QUIC|GOST relay over QUIC
-gost-kcp|GOST relay+KCP|GOST relay over KCP (UDP, lossy links)
-gost-grpc|GOST relay+gRPC|GOST relay over gRPC
-rathole|Rathole TCP|Reverse tunnel, Rust, very fast
-backhaul-tcp|Backhaul TCP|Reverse tunnel, TCP
-backhaul-tcpmux|Backhaul TCPMux|Reverse tunnel, multiplexed TCP
-backhaul-udp|Backhaul UDP|Reverse tunnel, UDP transport
-backhaul-ws|Backhaul WS|Reverse tunnel, WebSocket
-backhaul-wsmux|Backhaul WSMux|Reverse tunnel, multiplexed WS
-frp-tcp|FRP TCP|Reverse proxy, TCP
-frp-kcp|FRP KCP|Reverse proxy, KCP
-frp-quic|FRP QUIC|Reverse proxy, QUIC
-frp-websocket|FRP WebSocket|Reverse proxy, WebSocket
-chisel|Chisel|Reverse tunnel over HTTP/WebSocket'
-REVERSE_RX='^(rathole|backhaul-.*|frp-.*|chisel)$'
+CATALOG='gre|GRE|Fast kernel L3 tunnel|Kernel
+gretap|GRE-TAP|Kernel L2 tunnel over GRE|Kernel
+ipip|IPIP|Lightest kernel tunnel|Kernel
+vxlan|VXLAN|Kernel UDP L2 tunnel|Kernel
+geneve|GENEVE|Kernel UDP tunnel, flexible|Kernel
+gre6|GRE6 (ip6gre)|GRE over IPv6 endpoints|Kernel
+gre6tap|GRE6-TAP|L2 GRE over IPv6|Kernel
+ipip6|IPIP6 (ip6tnl)|IPv4 inside IPv6|Kernel
+dnat|Direct DNAT|iptables forward, no encryption|Kernel
+gre-fou|GRE over FOU|GRE inside UDP, passes NAT|UDP Encap
+gre-gue|GRE over GUE|GRE inside Generic UDP Encap|UDP Encap
+gretap-fou|GRE-TAP over FOU|L2 GRE inside UDP|UDP Encap
+gretap-gue|GRE-TAP over GUE|L2 GRE inside GUE|UDP Encap
+ipip-fou|IPIP over FOU|IPIP inside UDP, low overhead|UDP Encap
+ipip-gue|IPIP over GUE|IPIP inside GUE|UDP Encap
+wg|WireGuard|Encrypted UDP, modern and fast|WireGuard
+wg-psk|WireGuard + PSK|Extra preshared key from token|WireGuard
+wg-1280|WireGuard MTU 1280|Safe MTU for filtered routes|WireGuard
+socat-tcp|Socat TCP|Simple TCP relay|Relay
+socat-udp|Socat UDP|Simple UDP relay|Relay
+haproxy|HAProxy TCP|L4 forward with port ranges|Relay
+gost-tcp|GOST relay TCP|GOST relay protocol over TCP|GOST Relay
+gost-tls|GOST relay+TLS|GOST relay protocol over TLS|GOST Relay
+gost-mtls|GOST relay+MTLS|GOST relay protocol over MTLS|GOST Relay
+gost-ws|GOST relay+WS|GOST relay protocol over WS|GOST Relay
+gost-mws|GOST relay+MWS|GOST relay protocol over MWS|GOST Relay
+gost-wss|GOST relay+WSS|GOST relay protocol over WSS|GOST Relay
+gost-mwss|GOST relay+MWSS|GOST relay protocol over MWSS|GOST Relay
+gost-h2|GOST relay+H2|GOST relay protocol over H2|GOST Relay
+gost-h2c|GOST relay+H2C|GOST relay protocol over H2C|GOST Relay
+gost-quic|GOST relay+QUIC|GOST relay protocol over QUIC|GOST Relay
+gost-kcp|GOST relay+KCP|GOST relay protocol over KCP|GOST Relay
+gost-grpc|GOST relay+gRPC|GOST relay protocol over gRPC|GOST Relay
+gosts-tcp|GOST SOCKS5 TCP|GOST SOCKS5 over TCP|GOST SOCKS5
+gosts-tls|GOST SOCKS5+TLS|GOST SOCKS5 over TLS|GOST SOCKS5
+gosts-mtls|GOST SOCKS5+MTLS|GOST SOCKS5 over MTLS|GOST SOCKS5
+gosts-ws|GOST SOCKS5+WS|GOST SOCKS5 over WS|GOST SOCKS5
+gosts-mws|GOST SOCKS5+MWS|GOST SOCKS5 over MWS|GOST SOCKS5
+gosts-wss|GOST SOCKS5+WSS|GOST SOCKS5 over WSS|GOST SOCKS5
+gosts-mwss|GOST SOCKS5+MWSS|GOST SOCKS5 over MWSS|GOST SOCKS5
+gosts-h2|GOST SOCKS5+H2|GOST SOCKS5 over H2|GOST SOCKS5
+gosts-h2c|GOST SOCKS5+H2C|GOST SOCKS5 over H2C|GOST SOCKS5
+gosts-quic|GOST SOCKS5+QUIC|GOST SOCKS5 over QUIC|GOST SOCKS5
+gosts-kcp|GOST SOCKS5+KCP|GOST SOCKS5 over KCP|GOST SOCKS5
+gosts-grpc|GOST SOCKS5+gRPC|GOST SOCKS5 over gRPC|GOST SOCKS5
+rathole|Rathole TCP|Reverse tunnel in Rust, very fast|Reverse
+backhaul-tcp|Backhaul TCP|Reverse tunnel, TCP|Reverse
+backhaul-tcpmux|Backhaul TCPMux|Reverse tunnel, TCPMux|Reverse
+backhaul-udp|Backhaul UDP|Reverse tunnel, UDP|Reverse
+backhaul-ws|Backhaul WS|Reverse tunnel, WS|Reverse
+backhaul-wsmux|Backhaul WSMux|Reverse tunnel, WSMux|Reverse
+frp-tcp|FRP TCP|Reverse proxy, TCP|Reverse
+frp-kcp|FRP KCP|Reverse proxy, KCP|Reverse
+frp-quic|FRP QUIC|Reverse proxy, QUIC|Reverse
+frp-websocket|FRP WebSocket|Reverse proxy, WebSocket|Reverse
+chisel|Chisel HTTP|Reverse tunnel over HTTP/WS|Reverse
+chisel-tls|Chisel HTTPS|Reverse tunnel over TLS|Reverse
+hy2|Hysteria2|QUIC tunnel, great on lossy links|Hysteria2
+hy2-obfs|Hysteria2 + Obfs|QUIC with salamander obfuscation|Hysteria2
+xray-vmess-tcp|Xray VMess TCP|Xray tunnel, VMess TCP|Xray
+xray-vmess-ws|Xray VMess WebSocket|Xray tunnel, VMess WebSocket|Xray
+xray-vmess-grpc|Xray VMess gRPC|Xray tunnel, VMess gRPC|Xray
+xray-vmess-httpupgrade|Xray VMess HTTPUpgrade|Xray tunnel, VMess HTTPUpgrade|Xray
+xray-vmess-kcp|Xray VMess mKCP|Xray tunnel, VMess mKCP|Xray
+xray-vless-ws|Xray VLESS WebSocket|Xray tunnel, VLESS WebSocket|Xray
+xray-vless-grpc|Xray VLESS gRPC|Xray tunnel, VLESS gRPC|Xray
+xray-vless-httpupgrade|Xray VLESS HTTPUpgrade|Xray tunnel, VLESS HTTPUpgrade|Xray
+xray-ss-aes128|Xray Shadowsocks AES-128|Xray tunnel, Shadowsocks AES-128|Xray
+xray-ss-aes256|Xray Shadowsocks AES-256|Xray tunnel, Shadowsocks AES-256|Xray
+xray-ss-chacha|Xray Shadowsocks ChaCha20|Xray tunnel, Shadowsocks ChaCha20|Xray'
+REVERSE_RX='^(rathole|backhaul-.*|frp-.*|chisel.*)$'
 
-engine_of(){ case $1 in gre|gretap|ipip|vxlan|gre6|ipip6|dnat) echo kernel;; wg) echo wg;; socat-*) echo socat;;
-  haproxy) echo haproxy;; gost-*) echo gost;; rathole) echo rathole;; backhaul-*) echo backhaul;; frp-*) echo frp;; chisel) echo chisel;; esac; }
+engine_of(){ case $1 in gre|gretap|ipip|vxlan|geneve|gre6|gre6tap|ipip6|dnat|*-fou|*-gue) echo kernel;; wg|wg-psk|wg-1280) echo wg;; socat-*) echo socat;;
+  haproxy) echo haproxy;; gost-*|gosts-*) echo gost;; rathole) echo rathole;; backhaul-*) echo backhaul;; frp-*) echo frp;; chisel|chisel-tls) echo chisel;; hy2|hy2-obfs) echo hysteria;; xray-*) echo xray;; esac; }
 type_name(){ echo "$CATALOG" | awk -F'|' -v t="$1" '$1==t{print $2}'; }
 
 # ---------- system ----------
@@ -94,7 +130,7 @@ banner(){
  ▀▀▀▀       ▀▀▀▀▀▀         ▀▀▀▀▀         ▀▀▀▀▀▀▀     ▀▀▀▀        ▀▀▀▀▀▀▀▀
 ART
   printf '\n  %sEm4dloverS Tunnel Manager%s  v%s\n' "$W" "$N" "$VER"
-  printf '  %sChannel%s  t.me/Em4dloverS\n  %sSupport%s  %st.me/kamr4%s\n' "$R" "$N" "$R" "$N" "$D" "$N"
+  printf '  %sChannel%s  t.me/Em4dloverS\n  %sSupport%s  %st.me/KaMr4ng%s\n' "$R" "$N" "$R" "$N" "$D" "$N"
   printf '  %s%s%s\n' "$DR" "$(printf '%.0s=' $(seq 1 60))" "$N"
   myip; printf '  %s%s %s  |  IP %s%s' "$D" "$OS_NAME" "$OS_VER" "$MYIP" "$N"; nap 1.8; printf '\r\e[K'
 }
@@ -116,7 +152,7 @@ summary(){ printf '\n  %sInstalled so far:%s\n' "$W" "$N"; local s; for s in "${
 fetch_bin(){ local repo=$1 rx=$2 t=/tmp/emad_dl url b f; shift 2; rm -rf $t; mkdir -p $t
   url=$(curl -fsSL "https://api.github.com/repos/$repo/releases/latest" | grep -oE '"browser_download_url": *"[^"]+"' | cut -d'"' -f4 | grep -E "$rx" | head -1)
   [ -n "$url" ] || return 1; curl -fsSL "$url" -o $t/pkg || return 1
-  case $url in *.zip) unzip -qo $t/pkg -d $t;; *.tar.gz) tar xzf $t/pkg -C $t;; *.gz) gunzip -c $t/pkg >$t/$1;; esac
+  case $url in *.zip) unzip -qo $t/pkg -d $t;; *.tar.gz) tar xzf $t/pkg -C $t;; *.gz) gunzip -c $t/pkg >$t/$1;; *) cp $t/pkg $t/$1;; esac
   for b in "$@"; do f=$(find $t -type f -name "$b" | head -1); [ -n "$f" ] || return 1; install -m755 "$f" /usr/local/bin/$b; done; }
 install_engine(){ local e=$1; STEPS=(); DONEN=0; TOTAL=3; mkdir -p "$(dirname "$LOG")"
   step "Updating package index" apt_update
@@ -132,6 +168,8 @@ install_engine(){ local e=$1; STEPS=(); DONEN=0; TOTAL=3; mkdir -p "$(dirname "$
        backhaul) step "Downloading Backhaul" fetch_bin Musixal/Backhaul "backhaul_linux_${ARCH_G}\.tar\.gz\$" backhaul;;
        frp) step "Downloading FRP" fetch_bin fatedier/frp "frp_.*_linux_${ARCH_G}\.tar\.gz\$" frps frpc;;
        chisel) step "Downloading Chisel" fetch_bin jpillora/chisel "chisel_.*_linux_${ARCH_G}\.gz\$" chisel;;
+       hysteria) step "Downloading Hysteria2" fetch_bin apernet/hysteria "hysteria-linux-${ARCH_G}\$" hysteria;;
+       xray) step "Downloading Xray" fetch_bin XTLS/Xray-core "Xray-linux-$([ "$ARCH_G" = amd64 ] && echo 64 || echo arm64-v8a)\.zip\$" xray;;
       esac;; esac
   step "Preparing directories" mkdir -p "$TUN" "$RUN" "$CFG" "$CONF/keys"
   summary; }
@@ -144,44 +182,56 @@ valid_ports(){ local t a b; [ -n "$1" ] || return 1
 port_tokens(){ echo "${PORTS//,/ }"; }
 port_list(){ local t; for t in $(port_tokens); do [[ $t == *-* ]] && seq "${t%-*}" "${t#*-}" || echo "$t"; done; }
 fw_open(){ command -v ufw >/dev/null && ufw status 2>/dev/null | grep -q active || return 0
-  local t; for t in $(port_tokens) "$CPORT"; do [ -n "$t" ] && ufw allow "${t/-/:}" >/dev/null 2>&1; done; return 0; }
+  local t; [ -n "${CPORT:-}" ] && [ "$CPORT" != 0 ] && ufw allow "$CPORT" >/dev/null 2>&1
+  if [ "$ROLE" = iran ] || [[ $TYPE =~ $REVERSE_RX ]]; then for t in $(port_tokens); do
+    if [[ $t == *-* ]]; then ufw allow "${t/-/:}/tcp" >/dev/null 2>&1; ufw allow "${t/-/:}/udp" >/dev/null 2>&1; else ufw allow "$t" >/dev/null 2>&1; fi; done; fi; return 0; }
 
 # ---------- generators (print lines of the run script) ----------
-gen_kernel(){ local a=1 b=2 ifn=emad$IDX mk="" tok pr dst MTU=1400 wa
+gen_kernel(){ local a=1 b=2 ifn=emad$IDX mk="" tok pr dst MTU=1400 wa fp=$((31000+IDX)) pre="" inp="" k e ipp lt post="" extra=""
   [ "$ROLE" = foreign ] && { a=2; b=1; }
   case $TYPE in
-   gre) mk="ip tunnel add $ifn mode gre local $LOCAL remote $REMOTE ttl 255";;
-   gretap) mk="ip link add $ifn type gretap local $LOCAL remote $REMOTE ttl 255";;
-   ipip) mk="ip tunnel add $ifn mode ipip local $LOCAL remote $REMOTE ttl 255";;
-   vxlan) MTU=1380; mk="ip link add $ifn type vxlan id $IDX local $LOCAL remote $REMOTE dstport $((4789+IDX)) nolearning";;
+   gre) mk="ip tunnel add $ifn mode gre local $LOCAL remote $REMOTE ttl 255"; inp="-p gre";;
+   gretap) mk="ip link add $ifn type gretap local $LOCAL remote $REMOTE ttl 255"; inp="-p gre";;
+   ipip) mk="ip tunnel add $ifn mode ipip local $LOCAL remote $REMOTE ttl 255"; inp="-p ipencap";;
+   vxlan) MTU=1380; mk="ip link add $ifn type vxlan id $IDX local $LOCAL remote $REMOTE dstport $((4789+IDX)) nolearning"; inp="-p udp --dport $((4789+IDX))";;
+   geneve) MTU=1380; mk="ip link add $ifn type geneve id $IDX remote $REMOTE dstport $((6081+IDX))"; inp="-p udp --dport $((6081+IDX))";;
    gre6) MTU=1380; mk="ip link add $ifn type ip6gre local $LOCAL remote $REMOTE ttl 255";;
+   gre6tap) MTU=1380; mk="ip link add $ifn type ip6gretap local $LOCAL remote $REMOTE ttl 255";;
    ipip6) MTU=1380; mk="ip link add $ifn type ip6tnl mode ipip6 local $LOCAL remote $REMOTE";;
-   wg) MTU=1380; mk="ip link add $ifn type wireguard";;
+   *-fou|*-gue) MTU=1380; k=${TYPE%%-*}; e=${TYPE##*-}; case $k in gre|gretap) ipp=47;; *) ipp=4;; esac
+      pre="modprobe fou 2>/dev/null; ip fou del port $fp 2>/dev/null; ip fou add port $fp $([ $e = gue ] && echo gue || echo "ipproto $ipp")"; post="ip fou del port $fp 2>/dev/null"
+      mk="ip link add $ifn type $k local $LOCAL remote $REMOTE ttl 255 encap $e encap-sport auto encap-dport $fp"; inp="-p udp --dport $fp";;
+   wg|wg-psk|wg-1280) MTU=1380; [ $TYPE = wg-1280 ] && MTU=1280; mk="ip link add $ifn type wireguard"; inp="-p udp --dport $((51800+IDX))";;
   esac
+  [ -n "${TMTU:-}" ] && MTU=$TMTU
   echo "sysctl -qw net.ipv4.ip_forward=1 net.ipv4.conf.all.rp_filter=0 net.ipv4.conf.default.rp_filter=0"
-  echo 'rules(){ local o=$1'
+  echo 'rules(){ local o=$1 i=$1; [ "$o" = -A ] && i=-I'
+  [ "$TYPE" != dnat ] && { echo "  iptables \$i INPUT -i $ifn -j ACCEPT"; echo "  iptables \$i FORWARD -i $ifn -j ACCEPT"; echo "  iptables \$i FORWARD -o $ifn -j ACCEPT"
+    echo "  iptables -t mangle \$o POSTROUTING -o $ifn -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --set-mss $((MTU-40))"; }
+  [ -n "$inp" ] && echo "  iptables \$i INPUT $inp -s $REMOTE -j ACCEPT"
   if [ "$ROLE" = iran ]; then
     dst="10.$IDX.0.2"; [ "$TYPE" = dnat ] && dst=$REMOTE
     for tok in $(port_tokens); do for pr in tcp udp; do
       echo "  iptables -t nat \$o PREROUTING -p $pr --dport ${tok/-/:} -j DNAT --to-destination $dst"; done; done
-    if [ "$TYPE" = dnat ]; then echo "  iptables -t nat \$o POSTROUTING -d $REMOTE -j MASQUERADE"
-    else echo "  iptables -t nat \$o POSTROUTING -o $ifn -j MASQUERADE"
-         echo "  iptables -t mangle \$o FORWARD -o $ifn -p tcp --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu"; fi
+    if [ "$TYPE" = dnat ]; then echo "  iptables -t nat \$o POSTROUTING -d $REMOTE -j MASQUERADE"; echo "  iptables \$i FORWARD -d $REMOTE -j ACCEPT"; echo "  iptables \$i FORWARD -s $REMOTE -j ACCEPT"
+    else echo "  iptables -t nat \$o POSTROUTING -o $ifn -j MASQUERADE"; fi
   fi
   echo '  :'; echo '}'; echo 'case $1 in'; echo ' start)'
   if [ "$TYPE" = dnat ]; then echo "  rules -D 2>/dev/null; rules -A ;;"; echo " stop) rules -D 2>/dev/null ;;"
   else
+    [ -n "$pre" ] && echo "  $pre"
     echo "  ip link del $ifn 2>/dev/null; $mk || exit 1"
-    if [ "$TYPE" = wg ]; then wa="private-key $CONF/keys/$NAME.key listen-port $((51800+IDX))"
-      [ -n "${PEER:-}" ] && { wa+=" peer $PEER allowed-ips 10.$IDX.0.0/30"; [ "$ROLE" = iran ] && wa+=" endpoint $REMOTE:$((51800+IDX)) persistent-keepalive 15"; }
+    if [[ $TYPE == wg* ]]; then wa="private-key $CONF/keys/$NAME.key listen-port $((51800+IDX))"
+      if [ "$TYPE" = wg-psk ]; then printf "$(printf %s "$(printf %s "$TOKEN" | sha256sum | cut -d' ' -f1)" | sed 's/../\\x&/g')" | base64 >"$CONF/keys/$NAME.psk"; chmod 600 "$CONF/keys/$NAME.psk"; extra=" preshared-key $CONF/keys/$NAME.psk"; fi
+      [ -n "${PEER:-}" ] && { wa+=" peer $PEER$extra allowed-ips 10.$IDX.0.0/30"; [ "$ROLE" = iran ] && wa+=" endpoint $REMOTE:$((51800+IDX)) persistent-keepalive 15"; }
       echo "  wg set $ifn $wa"; fi
-    echo "  ip addr add 10.$IDX.0.$a/30 dev $ifn; ip link set $ifn mtu $MTU up"
+    echo "  ip addr add 10.$IDX.0.$a/30 dev $ifn; ip link set $ifn txqueuelen 10000 mtu $MTU up"
     echo "  command -v ufw >/dev/null && ufw allow in on $ifn >/dev/null 2>&1"
     echo "  rules -D 2>/dev/null; rules -A ;;"
-    echo " stop) rules -D 2>/dev/null; ip link del $ifn 2>/dev/null ;;"
+    echo " stop) rules -D 2>/dev/null; ip link del $ifn 2>/dev/null; $post ;;"
   fi; echo 'esac'; }
 
-gen_gost(){ local t=${TYPE#gost-} sch a=""; sch="relay+$t"; [ "$t" = tcp ] && sch=relay; echo 'case $1 in start)'
+gen_gost(){ local fam=${TYPE%%-*} t=${TYPE#*-} base=relay sch a="" p; [ "$fam" = gosts ] && base=socks5; sch="$base+$t"; [ "$t" = tcp ] && sch=$base; echo 'case $1 in start)'
   if [ "$ROLE" = foreign ]; then echo "  exec gost -L \"$sch://emad:$TOKEN@:$CPORT\" ;;"
   else for p in $(port_list); do a+=" -L tcp://:$p/127.0.0.1:$p"; done
        echo "  exec gost$a -F \"$sch://emad:$TOKEN@$REMOTE:$CPORT\" ;;"; fi; echo 'esac'; }
@@ -204,10 +254,12 @@ gen_frp(){ local pr=${TYPE#frp-} f p; echo 'case $1 in start)'
     { printf 'serverAddr = "%s"\nserverPort = %s\nauth.token = "%s"\ntransport.protocol = "%s"\n' "$REMOTE" "$CPORT" "$TOKEN" "$pr"
       for p in $(port_list); do printf '[[proxies]]\nname = "p%s"\ntype = "tcp"\nlocalIP = "127.0.0.1"\nlocalPort = %s\nremotePort = %s\n' "$p" "$p" "$p"; done; } >"$f"
     echo "  exec frpc -c $f ;;"; fi; chmod 600 "$f"; echo 'esac'; }
-gen_chisel(){ local a="" p; echo 'case $1 in start)'
-  if [ "$ROLE" = iran ]; then echo "  exec chisel server --port $CPORT --reverse --auth emad:$TOKEN ;;"
+gen_chisel(){ local a="" p tls="" sch=http c=$CFG/$NAME; echo 'case $1 in start)'
+  if [ "$TYPE" = chisel-tls ]; then sch=https
+    if [ "$ROLE" = iran ]; then [ -f $c.crt ] || openssl req -x509 -newkey rsa:2048 -nodes -days 3650 -subj /CN=emad -keyout $c.key -out $c.crt 2>/dev/null; tls=" --tls-key $c.key --tls-cert $c.crt"; else tls=" --tls-skip-verify"; fi; fi
+  if [ "$ROLE" = iran ]; then echo "  exec chisel server --port $CPORT --reverse --auth emad:$TOKEN$tls ;;"
   else for p in $(port_list); do a+=" R:0.0.0.0:$p:127.0.0.1:$p"; done
-       echo "  exec chisel client --auth emad:$TOKEN --keepalive 10s http://$REMOTE:$CPORT$a ;;"; fi; echo 'esac'; }
+       echo "  exec chisel client --auth emad:$TOKEN --keepalive 10s$tls $sch://$REMOTE:$CPORT$a ;;"; fi; echo 'esac'; }
 gen_socat(){ local pr=TCP p; [ "$TYPE" = socat-udp ] && pr=UDP; echo 'case $1 in start)'
   if [ "$ROLE" = iran ]; then for p in $(port_list); do echo "  socat $pr-LISTEN:$p,fork,reuseaddr $pr:$REMOTE:$p &"; done; echo "  wait ;;"
   else echo "  exec sleep infinity ;;"; fi; echo 'esac'; }
@@ -216,10 +268,36 @@ gen_haproxy(){ local f=$CFG/$NAME.cfg t; echo 'case $1 in start)'
       for t in $(port_tokens); do echo "  bind *:$t"; done; printf '  default_backend b\nbackend b\n  server s1 %s\n' "$REMOTE"; } >"$f"
     echo "  exec haproxy -db -f $f ;;"; else echo "  exec sleep infinity ;;"; fi; echo 'esac'; }
 
+gen_hysteria(){ local f=$CFG/$NAME.yaml p ob=""; echo 'case $1 in start)'
+  [ "$TYPE" = hy2-obfs ] && ob=$'obfs:\n  type: salamander\n  salamander:\n    password: '"$TOKEN"$'\n'
+  if [ "$ROLE" = foreign ]; then [ -f $CFG/$NAME.crt ] || openssl req -x509 -nodes -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -days 3650 -subj /CN=emad -keyout $CFG/$NAME.key -out $CFG/$NAME.crt 2>/dev/null
+    printf 'listen: :%s\ntls:\n  cert: %s\n  key: %s\nauth:\n  type: password\n  password: %s\n%s' "$CPORT" "$CFG/$NAME.crt" "$CFG/$NAME.key" "$TOKEN" "$ob" >"$f"; echo "  exec hysteria server -c $f ;;"
+  else { printf 'server: %s:%s\nauth: %s\ntls:\n  insecure: true\n%s' "$REMOTE" "$CPORT" "$TOKEN" "$ob"
+      echo "tcpForwarding:"; for p in $(port_list); do printf '  - listen: 0.0.0.0:%s\n    remote: 127.0.0.1:%s\n' "$p" "$p"; done
+      echo "udpForwarding:"; for p in $(port_list); do printf '  - listen: 0.0.0.0:%s\n    remote: 127.0.0.1:%s\n    timeout: 60s\n' "$p" "$p"; done; } >"$f"; echo "  exec hysteria client -c $f ;;"; fi
+  chmod 600 "$f"; echo 'esac'; }
+gen_xray(){ local f=$CFG/$NAME.json k=${TYPE#xray-} proto net m="" st h u ss sc ins="" p first=1
+  h=$(printf %s "$TOKEN" | md5sum | cut -c1-32); u="${h:0:8}-${h:8:4}-${h:12:4}-${h:16:4}-${h:20:12}"
+  case $k in vmess-*) proto=vmess; net=${k#vmess-};; vless-*) proto=vless; net=${k#vless-};; ss-aes128) proto=shadowsocks; m=aes-128-gcm;; ss-aes256) proto=shadowsocks; m=aes-256-gcm;; ss-chacha) proto=shadowsocks; m=chacha20-ietf-poly1305;; esac
+  case ${net:-tcp} in ws) st='{"network":"ws","wsSettings":{"path":"/emad"}}';; grpc) st='{"network":"grpc","grpcSettings":{"serviceName":"emad"}}';;
+    httpupgrade) st='{"network":"httpupgrade","httpupgradeSettings":{"path":"/emad"}}';; kcp) st='{"network":"kcp","kcpSettings":{"seed":"'$TOKEN'"}}';; *) st='{"network":"tcp"}';; esac
+  [ "$proto" = shadowsocks ] && st='{"network":"tcp"}'
+  echo 'case $1 in start)'
+  if [ "$ROLE" = foreign ]; then
+    case $proto in vmess) ss='{"clients":[{"id":"'$u'"}]}';; vless) ss='{"clients":[{"id":"'$u'"}],"decryption":"none"}';; *) ss='{"method":"'$m'","password":"'$TOKEN'","network":"tcp,udp"}';; esac
+    printf '{"log":{"loglevel":"warning"},"inbounds":[{"listen":"0.0.0.0","port":%s,"protocol":"%s","settings":%s,"streamSettings":%s}],"outbounds":[{"protocol":"freedom"}]}\n' "$CPORT" "$proto" "$ss" "$st" >"$f"
+  else
+    case $proto in vmess) sc='{"vnext":[{"address":"'$REMOTE'","port":'$CPORT',"users":[{"id":"'$u'","security":"auto"}]}]}';; vless) sc='{"vnext":[{"address":"'$REMOTE'","port":'$CPORT',"users":[{"id":"'$u'","encryption":"none"}]}]}';;
+      *) sc='{"servers":[{"address":"'$REMOTE'","port":'$CPORT',"method":"'$m'","password":"'$TOKEN'"}]}';; esac
+    for p in $(port_list); do ins+="${first/1/}"; [ $first = 0 ] && ins+=","; first=0; ins+='{"tag":"d'$p'","listen":"0.0.0.0","port":'$p',"protocol":"dokodemo-door","settings":{"address":"127.0.0.1","port":'$p',"network":"tcp,udp"}}'; done
+    printf '{"log":{"loglevel":"warning"},"inbounds":[%s],"outbounds":[{"protocol":"%s","settings":%s,"streamSettings":%s}]}\n' "$ins" "$proto" "$sc" "$st" >"$f"
+  fi
+  chmod 600 "$f"; echo "  exec xray run -c $f ;;"; echo 'esac'; }
+
 gen_run(){ local f=$RUN/$NAME.sh; SVC=simple
   { echo '#!/bin/bash'; echo "# Em4dloverS tunnel: $NAME ($TYPE, $ROLE)"
-    case $TYPE in gre|gretap|ipip|vxlan|gre6|ipip6|wg|dnat) SVC=oneshot; gen_kernel;; gost-*) gen_gost;; rathole) gen_rathole;;
-      backhaul-*) gen_backhaul;; frp-*) gen_frp;; chisel) gen_chisel;; socat-*) gen_socat;; haproxy) gen_haproxy;; esac; } >"$f"
+    case $TYPE in gre|gretap|ipip|vxlan|geneve|gre6|gre6tap|ipip6|*-fou|*-gue|wg|wg-psk|wg-1280|dnat) SVC=oneshot; gen_kernel;; gost-*|gosts-*) gen_gost;; rathole) gen_rathole;;
+      backhaul-*) gen_backhaul;; frp-*) gen_frp;; chisel|chisel-tls) gen_chisel;; socat-*) gen_socat;; haproxy) gen_haproxy;; hy2|hy2-obfs) gen_hysteria;; xray-*) gen_xray;; esac; } >"$f"
   chmod 700 "$f"; }
 write_unit(){ local u="$UNITDIR/emad-$NAME.service"; mkdir -p "$UNITDIR"
   { printf '[Unit]\nDescription=Em4dloverS tunnel %s (%s)\nAfter=network-online.target\nWants=network-online.target\n\n[Service]\nType=%s\n' "$NAME" "$TYPE" "$SVC"
@@ -379,10 +457,10 @@ manage(){ while :; do hdr "Tunnels"; local i=0 line names=()
    e) edit_menu "$n"; pause;;
    l) journalctl -u "emad-$n" -n 40 --no-pager; pause;;
    k) load "$n"; ask "Peer public key"; sed -i "s|^PEER=.*|PEER=$REPLY|" "$TUN/$n.conf"; load "$n"; gen_run; sysd restart "emad-$n" && echo "  Done.";; esac; done; }
-install_menu(){ hdr "Install requirements"; local e i=0 list=(kernel wg socat haproxy gost rathole backhaul frp chisel all)
-  for e in "${list[@]}"; do i=$((i+1)); printf '  %s%2d%s  %s\n' "$R" "$i" "$N" "$e"; done; ask "Number" 10; e=${list[$((REPLY-1))]:-}; [ -n "$e" ] || return
-  if [ "$e" = all ]; then for e in "${list[@]:0:9}"; do hdr "Installing: $e"; install_engine "$e"; done; else install_engine "$e"; fi; }
-support(){ hdr "Contact"; printf '  Channel : %st.me/Em4dloverS%s\n  Support : %st.me/kamr4%s\n' "$W" "$N" "$D" "$N"; }
+install_menu(){ hdr "Install requirements"; local e i=0 list=(kernel wg socat haproxy gost rathole backhaul frp chisel hysteria xray all)
+  for e in "${list[@]}"; do i=$((i+1)); printf '  %s%2d%s  %s\n' "$R" "$i" "$N" "$e"; done; ask "Number" 12; e=${list[$((REPLY-1))]:-}; [ -n "$e" ] || return
+  if [ "$e" = all ]; then for e in "${list[@]:0:11}"; do hdr "Installing: $e"; install_engine "$e"; done; else install_engine "$e"; fi; }
+support(){ hdr "Contact"; printf '  Channel : %st.me/Em4dloverS%s\n  Support : %st.me/KaMr4ng%s\n' "$W" "$N" "$D" "$N"; }
 menu(){ while :; do banner
   printf '\n  %s[1]%s Install requirements        %s[6]%s Web panel (status/manage)\n  %s[2]%s Create tunnel (wizard)       %s[7]%s Panel SSL (domain)\n  %s[3]%s Manage tunnels               %s[8]%s Reset panel login\n  %s[4]%s Tunnel Status (this server)  %s[9]%s Contact / Telegram\n  %s[5]%s Optimize network (BBR)       %s[0]%s Exit\n\n' \
     $R $N $R $N $R $N $R $N $R $N $R $N $R $N $R $N $R $N $R $N

@@ -384,6 +384,49 @@ EOF
 tune_all(){ optimize; local f n t i
   for f in "$TUN"/*.conf; do [ -f "$f" ] || continue; ( . "$f"; case $TYPE in gre|gretap|ipip|vxlan|geneve|gre6|gre6tap|ipip6|*-fou|*-gue|wg*) ip link set "emad$IDX" mtu $([[ $TYPE == vxlan || $TYPE == geneve || $TYPE == gre6* || $TYPE == *-fou || $TYPE == *-gue || $TYPE == wg* ]] && echo 1380 || echo 1400) 2>/dev/null;; esac ); done
   echo "OK BBR, buffers and MTU applied"; }
+# ---------- temporary guide site (30 min, random 5-digit port, auto-removed) ----------
+guide_make(){ local n=$1 TTL=${EMAD_GUIDE_TTL:-1800} port dir html ip; load "$n"; [ -n "$TYPE" ] || { echo "ERR no such tunnel"; return 1; }
+  myip; ip=${MYIP:-127.0.0.1}; port=$(rand_port); dir=/tmp/emad-guide-$port; mkdir -p "$dir"
+  local role_title role_steps type_label=$(type_name "$TYPE")
+  if [ "$ROLE" = foreign ]; then role_title="Foreign server (exit)"
+    role_steps="<li>Open the menu with <code>emad</code>, then choose <b>2 Create tunnel</b>.</li><li>Role: <b>Foreign</b>. No ports are needed on this side.</li><li>Type: <b>$type_label</b>.</li><li>Tunnel ID: <b>$IDX</b>, control port: <b>${CPORT:-not needed}</b>, token: <b>${TOKEN:-not needed}</b>.</li><li>Other server IP: <b>$LOCAL</b> (the Iran server).</li>"
+  else role_title="Iran server (entry)"
+    role_steps="<li>Open the menu with <code>emad</code>, then choose <b>2 Create tunnel</b>.</li><li>Role: <b>Iran</b>.</li><li>Type: <b>$type_label</b>.</li><li>Tunnel ID: <b>$IDX</b>, control port: <b>${CPORT:-not needed}</b>, token: <b>${TOKEN:-not needed}</b>.</li><li>Ports to forward: <b>$PORTS</b>.</li><li>Other server IP: <b>$REMOTE</b> (the foreign server).</li>"
+  fi
+  cat >"$dir/index.html" <<HTML
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Em4dloverS guide: $NAME</title>
+<style>
+:root{--w:#fff;--k:#000;--r:#e1131f;--g:#f4f4f2}
+*{box-sizing:border-box}body{margin:0;font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--k);color:var(--w)}
+header{padding:38px 24px 26px;border-bottom:2px solid var(--r);background:linear-gradient(120deg,#000 60%,#1a0000)}
+header h1{margin:0;font:600 34px/1.1 Georgia,"Times New Roman",serif}header h1 em{color:var(--r);font-style:normal}
+header p{margin:8px 0 0;color:#bdbdb8}.warn{display:inline-block;margin-top:14px;padding:6px 12px;border:1px solid var(--r);border-radius:99px;color:#ff8a90;font-size:14px}
+main{max-width:820px;margin:0 auto;padding:26px 22px 60px}
+.card{background:var(--w);color:var(--k);border-radius:16px;padding:22px 24px;margin:0 0 18px;box-shadow:0 14px 40px #0008}
+.card h2{margin:0 0 10px;font-size:20px}.card ol{padding-left:22px;margin:0}.card li{margin:6px 0}
+code{background:var(--g);padding:2px 7px;border-radius:6px;font-size:14px}.red{color:var(--r)}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin:12px 0 0}
+.kv div{border-left:3px solid var(--r);padding:4px 10px;background:var(--g);border-radius:0 8px 8px 0;color:var(--k)}.kv small{display:block;color:#666}
+.step{display:flex;gap:14px;align-items:flex-start}.num{flex:none;width:34px;height:34px;border-radius:50%;background:var(--r);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+footer{text-align:center;color:#8f8f8b;font-size:14px;padding:20px}footer a{color:#fff}
+</style></head><body>
+<header><h1 class="serif">Em4d<em>loverS</em> Tunnel</h1><p>Setup guide for tunnel <b>$NAME</b> ($type_label)</p>
+<span class="warn">This page closes automatically in 30 minutes and is then deleted.</span></header>
+<main>
+<div class="card"><h2>Your tunnel</h2><div class="kv">
+<div><small>Name</small><b>$NAME</b></div><div><small>Type</small><b>$type_label</b></div><div><small>This server</small><b>$role_title</b></div>
+<div><small>Tunnel ID</small><b>$IDX</b></div><div><small>Other server</small><b>${REMOTE:-$LOCAL}</b></div><div><small>Ports</small><b>${PORTS:-1}</b></div></div></div>
+<div class="card"><h2>Step 1: Install the menu on both servers</h2><ol><li>Log in as <code>root</code>.</li><li>Run: <code>bash &lt;(curl -Ls https://raw.githubusercontent.com/emdabsii/Em4dloverS-Tunnel/main/install.sh)</code></li><li>Wait until the menu opens.</li></ol></div>
+<div class="card"><h2>Step 2: Create the tunnel on $role_title</h2><ol>$role_steps</ol></div>
+<div class="card"><h2>Step 3: Use the same values on the other server</h2><p>Tunnel ID, control port and token must match exactly on both servers. The type must be the same too.</p></div>
+<div class="card"><h2>Step 4: Check it works</h2><ol><li>Open the web panel and select the tunnel.</li><li>Press <b>Check now</b>. A green state means the two servers are connected.</li><li>If it stays red, check that the control port and ports are open in your provider firewall.</li></ol></div>
+<div class="card"><h2>Need help?</h2><p>Channel: <a class="red" href="https://t.me/Em4dloverS">t.me/Em4dloverS</a><br>Support: <a class="red" href="https://t.me/KaMr4ng">t.me/KaMr4ng</a></p></div>
+</main><footer>Em4dloverS Tunnel  |  t.me/Em4dloverS</footer></body></html>
+HTML
+  ( setsid timeout "$TTL" python3 -m http.server "$port" --bind 0.0.0.0 --directory "$dir" >/dev/null 2>&1; rm -rf "$dir" ) </dev/null >/dev/null 2>&1 &
+  command -v ufw >/dev/null && ufw allow "$port/tcp" >/dev/null 2>&1
+  sleep 1; echo "http://$ip:$port/"; }
+
 # ---------- web panel ----------
 panel_cfg(){ python3 "$APP/panel/app.py" set "$@"; }
 panel_url(){ python3 "$APP/panel/app.py" url "$MYIP"; }
@@ -455,9 +498,10 @@ manage(){ while :; do hdr "Tunnels"; local i=0 line names=()
     printf '  %s%2d%s  %-14s %-16s %-8s %s -> %s  %s%s%s\n' "$R" "$i" "$N" "$n" "$(type_name "$t")" "$r" "${p:0:18}" "$rem" "$c" "$s" "$N"; done < <(list_tunnels)
   [ $i -eq 0 ] && { echo "  No tunnels yet."; pause; return; }
   ask "Select number (0 = back)" 0; [ "$REPLY" = 0 ] && return; local n=${names[$((REPLY-1))]:-}; [ -n "$n" ] || continue
-  printf '  %ss%s start  %sx%s stop  %sr%s restart  %se%s edit  %sl%s logs  %sk%s WG peer key  %sd%s delete\n' "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N"
+  printf '  %ss%s start  %sx%s stop  %sr%s restart  %se%s edit  %sg%s setup guide  %sl%s logs  %sk%s WG key  %sd%s delete\n' "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N" "$R" "$N"
   ask "Action"; case $REPLY in s) act start "$n";; x) act stop "$n";; r) act restart "$n";; d) ask "Type YES to delete" no; [ "$REPLY" = YES ] && act delete "$n";;
    e) edit_menu "$n"; pause;;
+   g) hdr "Setup guide"; echo "  Open this link in your browser (closes after 30 minutes):"; echo "  $(guide_make "$n")"; pause;;
    l) journalctl -u "emad-$n" -n 40 --no-pager; pause;;
    k) load "$n"; ask "Peer public key"; sed -i "s|^PEER=.*|PEER=$REPLY|" "$TUN/$n.conf"; load "$n"; gen_run; sysd restart "emad-$n" && echo "  Done.";; esac; done; }
 install_menu(){ hdr "Install requirements"; local e i=0 list=(kernel wg socat haproxy gost rathole backhaul frp chisel hysteria xray all)
@@ -475,5 +519,6 @@ if [ "${1:-}" = api ]; then shift; need_root; case ${1:-} in
   catalog) echo "$CATALOG";; list) list_tunnels;; status) status_table machine;; ip) myip; echo "$MYIP";; act) act "$2" "$3";;
   edit) shift; edit_tunnel "$@";;
   tune) tune_all;;
+  guide) guide_make "$2";;
   create) NAME=$2 TYPE=$3 ROLE=$4 LOCAL=$5 REMOTE=$6 PORTS=$7 CPORT=$8 TOKEN=$9 IDX=${10} PEER=${11:-}; create_tunnel;; esac; exit 0; fi
 need_root; detect_os; mkdir -p "$TUN" "$RUN" "$CFG" "$CONF/keys" "$ROOT/etc/sysctl.d" 2>/dev/null; menu

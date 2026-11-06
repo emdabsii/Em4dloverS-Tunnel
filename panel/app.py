@@ -359,6 +359,70 @@ def api_packets(n):
 def api_tune():
     r = emad("tune"); return jsonify(ok=r.startswith("OK"), out=r)
 
+
+PANELS = {
+ "sanaei": {"name": "Sanaei (3x-ui)", "badge": "S", "color": "#e1131f", "steps": [
+   ("ورود به پنل", "وارد پنل Sanaei (3x-ui) شو و از منوی سمت چپ گزینه <b>Xray Configs</b> یا <b>Outbounds</b> رو باز کن."),
+   ("افزودن Outbound", "روی <b>Add Outbound</b> بزن. <b>Protocol</b> را <code>socks</code> انتخاب کن (یا <code>http</code> اگه تانل HTTP داره)."),
+   ("تنظیم آدرس", "در بخش <b>Address</b> بنویس <code>{endpoint_host}</code> و در <b>Port</b> بنویس <code>{endpoint_port}</code>. اگه پنل روی همین سرور ایرانه، به‌جای IP بنویس <code>127.0.0.1</code>."),
+   ("ذخیره و اعمال", "Outbound رو با یه <b>Tag</b> دلخواه مثل <code>{name}</code> ذخیره کن و تنظیمات Xray رو <b>Restart</b> کن."),
+   ("مسیریابی (Routing)", "از بخش <b>Routing Rules</b> یه قانون اضافه کن که <b>outboundTag</b> اون <code>{name}</code> باشه و <b>inboundTag</b> یا <b>domain/ip</b> ترافیکی که می‌خوای از تانل بره."),
+   ("تست", "از کلاینت (مثلاً v2rayNG یا Nekobox) به این پنل وصل شو و سایتی رو باز کن. اگه باز شد، تانل درست کار می‌کنه."),
+ ]},
+ "pasargad": {"name": "Pasargad", "badge": "P", "color": "#000000", "steps": [
+   ("ورود به پنل", "وارد پنل پاسارگارد شو و به بخش <b>Outbounds</b> یا <b>Xray Config</b> برو."),
+   ("افزودن Outbound", "یه Outbound جدید بساز. <b>Protocol</b> را <code>socks</code> بذار (یا <code>http</code>)."),
+   ("تنظیم آدرس", "<b>Address</b> را <code>{endpoint_host}</code> و <b>Port</b> را <code>{endpoint_port}</code> بذار. روی همین سرور ایران <code>127.0.0.1</code> بنویس."),
+   ("ذخیره و Restart", "با یه <b>Tag</b> مثل <code>{name}</code> ذخیره کن و سرویس Xray رو Restart کن."),
+   ("Routing", "در بخش Routing، برای ترافیکی که می‌خوای از تانل بره، <b>outboundTag</b> را <code>{name}</code> بذار."),
+   ("تست", "یه کلاینت به پنل وصل کن و یه سایت باز کن تا مطمئن شی ترافیک از تانل رد می‌شه."),
+ ]},
+ "marzban": {"name": "Marzban", "badge": "M", "color": "#e1131f", "steps": [
+   ("ویرایش فایل کانفیگ", "روی سرور پنل، فایل <code>xray_config.json</code> رو باز کن (معمولاً در مسیر <code>/opt/marzban</code> یا از داخل داشبورد بخش Xray Config)."),
+   ("اضافه کردن Outbound", "داخل آرایه <b>outbounds</b> یه آیتم جدید اضافه کن با <code>&quot;tag&quot;: &quot;{name}&quot;</code> و <code>&quot;protocol&quot;: &quot;socks&quot;</code>."),
+   ("تنظیم سرور", "داخل <b>settings</b> → <b>servers</b> بنویس <code>&quot;address&quot;: &quot;{endpoint_host}&quot;</code> و <code>&quot;port&quot;: {endpoint_port}</code>."),
+   ("Routing", "در <b>routing.rules</b> یه قانون اضافه کن با <code>&quot;outboundTag&quot;: &quot;{name}&quot;</code> و شرط دامنه یا IP که می‌خوای."),
+   ("ذخیره و ری‌استارت", "فایل رو ذخیره کن و از داشبورد یا با <code>marzban restart</code> سرویس رو ری‌استارت کن."),
+   ("تست", "یه کاربر تست بساز، کانفیگش رو به کلاینت بده و سایتی رو باز کن."),
+ ]},
+}
+def panel_guide_html(c, key):
+    p = PANELS[key]; mip = emad("ip") or "127.0.0.1"
+    port = (c.get("PORTS") or "1").split(",")[0].split("-")[0]
+    host = mip if c.get("ROLE") == "iran" else c.get("REMOTE", mip)
+    subs = {"endpoint_host": host, "endpoint_port": port, "name": c["NAME"]}
+    def fill(t):
+        for k, v in subs.items(): t = t.replace("{" + k + "}", str(v))
+        return t
+    steps = "".join('<div class="stp"><div class="sn">%d</div><div><h3>%s</h3><p>%s</p></div></div>' % (i + 1, t, fill(d)) for i, (t, d) in enumerate(p["steps"]))
+    return """<!doctype html><html lang="fa" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>%(name)s guide</title>
+<style>:root{--w:#fff;--k:#000;--r:#e1131f}*{box-sizing:border-box}body{margin:0;font:15px/1.9 Vazirmatn,Tahoma,system-ui,sans-serif;background:#f4f4f2;color:var(--k)}
+header{background:var(--k);color:#fff;padding:26px 22px;border-bottom:3px solid var(--r)}header h1{margin:0;font-size:24px}header p{margin:6px 0 0;color:#c8c8c4}
+.bdg{display:inline-flex;width:40px;height:40px;border-radius:50%%;align-items:center;justify-content:center;background:var(--r);color:#fff;font-weight:700;margin-left:10px;vertical-align:middle}
+main{max-width:860px;margin:0 auto;padding:22px}.box{background:var(--w);border-radius:16px;padding:18px 20px;margin-bottom:16px;box-shadow:0 10px 26px #0000001a}
+.box h2{margin:0 0 6px;font-size:17px}.stp{display:flex;gap:14px;background:var(--w);border-radius:14px;padding:16px 18px;margin-bottom:12px;border-right:4px solid var(--r);box-shadow:0 6px 18px #0000000f}
+.stp h3{margin:0;font-size:16px}.stp p{margin:4px 0 0}.sn{flex:none;width:36px;height:36px;border-radius:50%%;background:var(--k);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+code{background:#f0f0ee;padding:2px 8px;border-radius:6px;direction:ltr;display:inline-block;font:13px ui-monospace,Consolas,monospace;color:#000}
+.val{display:flex;flex-wrap:wrap;gap:8px}.val span{background:var(--k);color:#fff;padding:6px 12px;border-radius:99px;font-size:14px}.val b{color:#ff8a90;font-weight:600;margin-left:6px}
+.note{border-right:4px solid var(--r);padding:10px 14px;background:#fff5f5;border-radius:10px;margin-top:14px}
+footer{text-align:center;color:#8f8f8b;font-size:13px;padding:18px}footer a{color:var(--k)}
+</style></head><body>
+<header><span class="bdg">%(badge)s</span><span style="font-size:24px;font-weight:600">آموزش اجرای تانل روی پنل %(name)s</span>
+<p>تانل <b>%(tname)s</b> (%(ttype)s) — Em4dloverS Tunnel</p></header>
+<main>
+<div class="box"><h2>مقادیر شما</h2><div class="val"><span><b>Tunnel</b>%(tname)s</span><span><b>Endpoint</b>%(host)s:%(port)s</span><span><b>Type</b>%(ttype)s</span></div>
+<div class="note">اگه پنل روی همین سرور ایرانه، Address را <code>127.0.0.1</code> بذار و پورت را همان <code>%(port)s</code> نگه دار.</div></div>
+%(steps)s
+<div class="box"><h2>اگه کار نکرد</h2><p>اول مطمئن شو تانل در پنل Em4dloverS وضعیت <b>Connected</b> (سبز) داره. بعد پورت‌ها در فایروال ارائه‌دهنده باز باشن. در آخر لاگ تانل رو از صفحه‌ی تانل ببین.</p></div>
+</main><footer>Em4dloverS Tunnel &nbsp;|&nbsp; <a href="https://t.me/Em4dloverS">t.me/Em4dloverS</a> &nbsp;|&nbsp; <a href="https://t.me/KaMr4ng">t.me/KaMr4ng</a></footer></body></html>""" % {
+     "name": p["name"], "badge": p["badge"], "tname": c["NAME"], "ttype": c.get("TYPE", ""), "host": host, "port": port, "steps": steps}
+
+@app.route("/tun/<n>/guide/<panel>")
+def tguide(n, panel):
+    c = tconf(n) if n.replace("-", "").replace("_", "").isalnum() else None
+    if not c or panel not in PANELS: abort(404)
+    return panel_guide_html(c, panel)
+
 @app.route("/tun/<n>")
 def tdetail(n):
     c = tconf(n) if n.replace("-", "").replace("_", "").isalnum() else None
@@ -382,6 +446,8 @@ async function pkts(){if(!pk)return;try{const d=await (await fetch('/api/packets
 async function tune(){const t=$('tuneb');t.disabled=true;$('tuner').textContent='optimizing...';try{const fd=new FormData();fd.append('t','{{csrf()}}');const d=await (await fetch('/api/tune',{method:'POST',body:fd})).json();$('tuner').textContent=d.ok?'done: '+d.out:'failed'}finally{t.disabled=false}}
 loadLog();setInterval(loadLog,4000);setInterval(pkts,2000);
 </script>
+<h2 class="serif">Panel setup guide</h2><p class="sub" style="margin-top:0">Pick your panel. The guide opens in Persian with the values of this tunnel filled in.</p>
+<div class="row" style="margin-bottom:24px">{% for k,lbl,col in [('sanaei','Sanaei (3x-ui)','#e1131f'),('pasargad','Pasargad','#000'),('marzban','Marzban','#e1131f')] %}<a class="btn" href="/tun/{{c.NAME}}/guide/{{k}}" target="_blank" style="border-color:{{col}}"><span style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:{{col}};color:#fff;align-items:center;justify-content:center;font-size:12px;font-weight:700">{{lbl[0]}}</span>{{lbl}}</a>{% endfor %}</div>
 <h2 class="serif">Live log and packets</h2>
 <div class="row" style="margin-bottom:10px"><button class="btn" onclick="pk=!pk;this.textContent=pk?'Pause packets':'Live packets'">Live packets</button><button class="btn" onclick="loadLog()">Refresh log</button></div>
 <div class="logbox" id="lg"></div>

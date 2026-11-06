@@ -339,7 +339,7 @@ edit_tunnel(){ local n=$1 kv k v; shift; [[ $n =~ ^[a-z0-9_-]+$ && -f "$TUN/$n.c
 load(){ NAME=$1; PEER=; . "$TUN/$1.conf" 2>/dev/null; }
 act(){ [[ $2 =~ ^[a-z0-9_-]+$ && -f "$TUN/$2.conf" ]] || { echo "ERR no such tunnel"; return 1; }
   case $1 in start|stop|restart) sysd "$1" "emad-$2" && echo OK || echo ERR;;
-   delete) sysd disable --now "emad-$2" >/dev/null 2>&1; rm -f "$UNITDIR/emad-$2.service" "$TUN/$2.conf" "$RUN/$2.sh" "$CFG/$2".* "$CONF/keys/$2".*; sysd daemon-reload; echo OK;;
+   delete) full_delete "$2"; echo OK;;
    *) echo ERR;; esac; }
 list_tunnels(){ local f; for f in "$TUN"/*.conf; do [ -f "$f" ] || continue; ( . "$f"; printf '%s|%s|%s|%s|%s|%s\n' "$NAME" "$TYPE" "$ROLE" "$REMOTE" "$PORTS" "$(sysd is-active "emad-$NAME" 2>/dev/null || echo unknown)" ); done; }
 
@@ -426,6 +426,16 @@ HTML
   ( setsid timeout "$TTL" python3 -m http.server "$port" --bind 0.0.0.0 --directory "$dir" >/dev/null 2>&1; rm -rf "$dir" ) </dev/null >/dev/null 2>&1 &
   command -v ufw >/dev/null && ufw allow "$port/tcp" >/dev/null 2>&1
   sleep 1; echo "http://$ip:$port/"; }
+
+full_delete(){ local n=$1 f ip i
+  load "$n" 2>/dev/null || true
+  sysd disable --now "emad-$n" >/dev/null 2>&1; sysd stop "emad-$n" >/dev/null 2>&1
+  [ -f "$RUN/$n.sh" ] && bash "$RUN/$n.sh" stop >/dev/null 2>&1          # removes firewall rules and the interface
+  if command -v ufw >/dev/null && [ -n "${CPORT:-}" ] && [ "${CPORT:-0}" != 0 ]; then ufw delete allow "$CPORT" >/dev/null 2>&1; fi
+  i="emad${IDX:-x}"; ip link del "$i" 2>/dev/null
+  rm -f "$UNITDIR/emad-$n.service" "$TUN/$n.conf" "$RUN/$n.sh" "$CFG/$n".* "$CONF/keys/$n".*
+  rm -rf /tmp/emad-guide-* 2>/dev/null
+  sysd daemon-reload >/dev/null 2>&1; return 0; }
 
 # ---------- web panel ----------
 panel_cfg(){ python3 "$APP/panel/app.py" set "$@"; }

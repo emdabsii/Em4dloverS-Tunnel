@@ -369,7 +369,7 @@ PANELS = {
    ("مسیریابی (Routing)", "از بخش <b>Routing Rules</b> یه قانون اضافه کن که <b>outboundTag</b> اون <code>{name}</code> باشه و <b>inboundTag</b> یا <b>domain/ip</b> ترافیکی که می‌خوای از تانل بره."),
    ("تست", "از کلاینت (مثلاً v2rayNG یا Nekobox) به این پنل وصل شو و سایتی رو باز کن. اگه باز شد، تانل درست کار می‌کنه."),
  ]},
- "pasargad": {"name": "Pasargad", "badge": "P", "color": "#000000", "steps": [
+ "pasargad": {"name": "Pasarguard", "badge": "P", "color": "#000000", "steps": [
    ("ورود به پنل", "وارد پنل پاسارگارد شو و به بخش <b>Outbounds</b> یا <b>Xray Config</b> برو."),
    ("افزودن Outbound", "یه Outbound جدید بساز. <b>Protocol</b> را <code>socks</code> بذار (یا <code>http</code>)."),
    ("تنظیم آدرس", "<b>Address</b> را <code>{endpoint_host}</code> و <b>Port</b> را <code>{endpoint_port}</code> بذار. روی همین سرور ایران <code>127.0.0.1</code> بنویس."),
@@ -447,7 +447,7 @@ async function tune(){const t=$('tuneb');t.disabled=true;$('tuner').textContent=
 loadLog();setInterval(loadLog,4000);setInterval(pkts,2000);
 </script>
 <h2 class="serif">Panel setup guide</h2><p class="sub" style="margin-top:0">Pick your panel. The guide opens in Persian with the values of this tunnel filled in.</p>
-<div class="row" style="margin-bottom:24px">{% for k,lbl,col in [('sanaei','Sanaei (3x-ui)','#e1131f'),('pasargad','Pasargad','#000'),('marzban','Marzban','#e1131f')] %}<a class="btn" href="/tun/{{c.NAME}}/guide/{{k}}" target="_blank" style="border-color:{{col}}"><span style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:{{col}};color:#fff;align-items:center;justify-content:center;font-size:12px;font-weight:700">{{lbl[0]}}</span>{{lbl}}</a>{% endfor %}</div>
+<div class="row" style="margin-bottom:24px">{% for k,lbl,col in [('sanaei','Sanaei (3x-ui)','#e1131f'),('pasargad','Pasarguard','#000'),('marzban','Marzban','#e1131f')] %}<a class="btn" href="/tun/{{c.NAME}}/guide/{{k}}" target="_blank" style="border-color:{{col}}"><span style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:{{col}};color:#fff;align-items:center;justify-content:center;font-size:12px;font-weight:700">{{lbl[0]}}</span>{{lbl}}</a>{% endfor %}</div>
 <h2 class="serif">Live log and packets</h2>
 <div class="row" style="margin-bottom:10px"><button class="btn" onclick="pk=!pk;this.textContent=pk?'Pause packets':'Live packets'">Live packets</button><button class="btn" onclick="loadLog()">Refresh log</button></div>
 <div class="logbox" id="lg"></div>

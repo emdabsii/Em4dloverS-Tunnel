@@ -437,6 +437,19 @@ full_delete(){ local n=$1 f ip i
   rm -rf /tmp/emad-guide-* 2>/dev/null
   sysd daemon-reload >/dev/null 2>&1; return 0; }
 
+# ---------- setup link (em4d://) ----------
+# The Iran side makes a link; the foreign side pastes it. The link carries
+# only what the other side needs: name, type, both IPs, tunnel ID, control port and token.
+make_link(){ load "$1"; [ -n "$TYPE" ] && [ "$ROLE" = iran ] || { echo "ERR only Iran-side tunnels can make a link"; return 1; }
+  local j; j=$(python3 -c 'import json,sys;print(json.dumps({"n":sys.argv[1],"t":sys.argv[2],"l":sys.argv[3],"r":sys.argv[4],"i":int(sys.argv[5]),"c":int(sys.argv[6] or 0),"k":sys.argv[7]}))' "$NAME" "$TYPE" "$REMOTE" "$LOCAL" "$IDX" "${CPORT:-0}" "${TOKEN:-}")
+  echo "em4d://$(printf %s "$j" | base64 -w0)"; }
+apply_link(){ local raw=$1 j; raw=${raw#em4d://}; raw=${raw//[[:space:]]/}
+  j=$(printf %s "$raw" | base64 -d 2>/dev/null) || { echo "ERR bad link"; return 1; }
+  eval "$(printf %s "$j" | python3 -c 'import json,sys,shlex
+d=json.load(sys.stdin)
+for k,v in {"NAME":d["n"],"TYPE":d["t"],"LOCAL":d["l"],"REMOTE":d["r"],"IDX":d["i"],"CPORT":d["c"],"TOKEN":d["k"]}.items(): print(k+"="+shlex.quote(str(v)))' 2>/dev/null)" || { echo "ERR bad link"; return 1; }
+  ROLE=foreign; PORTS=1; PEER=""; create_tunnel; }
+
 # ---------- web panel ----------
 panel_cfg(){ python3 "$APP/panel/app.py" set "$@"; }
 panel_url(){ python3 "$APP/panel/app.py" url "$MYIP"; }
@@ -529,6 +542,8 @@ if [ "${1:-}" = api ]; then shift; need_root; case ${1:-} in
   catalog) echo "$CATALOG";; list) list_tunnels;; status) status_table machine;; ip) myip; echo "$MYIP";; act) act "$2" "$3";;
   edit) shift; edit_tunnel "$@";;
   tune) tune_all;;
+  link) make_link "$2";;
+  apply-link) apply_link "$2";;
   guide) guide_make "$2";;
   create) NAME=$2 TYPE=$3 ROLE=$4 LOCAL=$5 REMOTE=$6 PORTS=$7 CPORT=$8 TOKEN=$9 IDX=${10} PEER=${11:-}; create_tunnel;; esac; exit 0; fi
 need_root; detect_os; mkdir -p "$TUN" "$RUN" "$CFG" "$CONF/keys" "$ROOT/etc/sysctl.d" 2>/dev/null; menu

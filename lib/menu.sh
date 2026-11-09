@@ -14,7 +14,51 @@ pick_type(){ local i=0 t n d g last=""; hdr "Choose tunnel type  ($(echo "$CATAL
   ask "Number" 1; TYPE=$(echo "$CATALOG" | sed -n "${REPLY}p" | cut -d'|' -f1); [ -n "$TYPE" ]; }
 
 # create a tunnel: pick type, side, IPs, ports, ID, control port, token
-wizard(){ local again=y; while [ "$again" = y ]; do
+BH_TRANSPORTS=(tcp tcpudp udp tcpmux ws wsmux wss)
+# pick a Backhaul transport from the list; prints it
+pick_bh(){ local i=0 t; printf '  Transports:  '; for t in "${BH_TRANSPORTS[@]}"; do i=$((i+1)); printf '%s%d%s %s   ' "$R" "$i" "$N" "$t"; done; echo
+  ask "Transport number" "$1"; REPLY=${BH_TRANSPORTS[$((REPLY-1))]:-tcp}; }
+
+pair_wizard(){ hdr "Mixed Backhaul tunnels (two transports, separate port groups)"
+  ask "Base name" "p$(next_idx)"; local base=$REPLY
+  printf '  This server is:  %s1%s Iran (entry)   %s2%s Foreign (exit)\n' "$R" "$N" "$R" "$N"; ask "Role" 1; [ "$REPLY" = 2 ] && ROLE=foreign || ROLE=iran
+  myip; ask "This server public IP" "$MYIP"; LOCAL=$REPLY; ask "Other server IP"; REMOTE=$REPLY
+  ask "Tunnel ID 1-250 (use the SAME on both servers)" "$(next_idx)"; IDX=$REPLY
+  local p1="" p2="" t1 t2 cp
+  if [ "$ROLE" = iran ]; then
+    hdr "Group 1"; ask "Ports for group 1 (e.g. 443,80)" "443"; p1=$REPLY; pick_bh 1; t1=$REPLY
+    hdr "Group 2 (Enter for no ports = skip)"; ask "Ports for group 2 (e.g. 2000-2100)" ""; p2=$REPLY
+    if [ -n "$p2" ]; then pick_bh 3; t2=$REPLY; fi
+    valid_ports "$p1" || { echo "  Bad ports for group 1."; return; }
+    [ -n "$p2" ] && { valid_ports "$p2" || { echo "  Bad ports for group 2."; return; }; }
+  else
+    hdr "Match what the Iran server used"
+    pick_bh 1; t1=$REPLY; ask "Second transport? (number, or Enter for none)" ""; [ -n "$REPLY" ] && { t2=${BH_TRANSPORTS[$((REPLY-1))]:-}; }
+  fi
+  ask "Control port of group 1 (group 2 uses +1)" "$((33000+IDX))"; cp=$REPLY
+  if [ "$ROLE" = iran ]; then TOKEN=$(rand_token)
+    printf '\n  %sToken for the foreign server%s (copy it now, shown once):\n  %s%s%s\n' "$W" "$N" "$W" "$TOKEN" "$N"
+  else
+    while :; do ask "Paste the token from the Iran server"; TOKEN=$REPLY
+      [[ $TOKEN =~ ^[A-Za-z0-9]{20,64}$ ]] && break; printf '  %sInvalid token.%s\n' "$R" "$N"; done
+  fi
+  local created=() k=0 n
+  for g in 1 2; do
+    local tr pr
+    if [ $g = 1 ]; then tr=$t1; pr=$p1; else tr=$t2; pr=$p2; fi
+    [ -n "$tr" ] || continue
+    NAME="$base-$tr"; TYPE="backhaul-$tr"; CPORT=$((cp+k)); PEER=""
+    if [ "$ROLE" = iran ]; then PORTS=$pr; else PORTS=1; fi
+    hdr "Preparing $(type_name "$TYPE")"; STEPS=(); DONEN=0; TOTAL=1; ensure_deps "$TYPE"
+    printf '  Result: %s%s%s\n' "$W" "$(create_tunnel)" "$N"; created+=("$NAME"); k=$((k+1))
+  done
+  if [ "$ROLE" = iran ]; then for n in "${created[@]}"; do printf '\n  %sLink for %s%s\n  %s%s%s\n' "$W" "$n" "$N" "$W" "$(make_link "$n")" "$N"; done; fi
+  printf '\n  %sCreated %s tunnel(s).%s Do the same on the other server.\n' "$G" "${#created[@]}" "$N"; }
+
+wizard(){ local again=y; hdr "Create tunnel"
+  printf '  %s1%s Single tunnel   %s2%s TCP + UDP pair (ports split across two transports)\n' "$R" "$N" "$R" "$N"
+  ask "Mode" 1; [ "$REPLY" = 2 ] && { pair_wizard; return; }
+  while [ "$again" = y ]; do
   pick_type || { echo "  Invalid choice."; return; }
   local e; e=$(engine_of "$TYPE"); hdr "Create: $(type_name "$TYPE")"
   ask "Tunnel name (a-z 0-9 - _)" "t$(next_idx)"; NAME=$REPLY

@@ -551,19 +551,44 @@ def api_job(jid):
         elif s in ("run", "ok", "fail"): steps.append({"s": s, "m": m})
     return jsonify(steps=steps, done=done, result=result)
 
+def start_job(name, typ, role, local, remote, ports, cport, token, idx, peer):
+    jid = "j" + secrets.token_hex(6); jdir = os.path.join(CONF, "jobs"); os.makedirs(jdir, exist_ok=True)
+    jf = os.path.join(jdir, jid + ".log"); open(jf, "w").write("run|Starting\n")
+    args = [EMAD, "api", "create"] + [str(x) for x in (name, typ, role, local, remote, ports, cport, token, idx, peer)]
+    subprocess.Popen(args, env=dict(os.environ, EMAD_JOB=jf), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    return jid
+
 @app.route("/new", methods=["GET", "POST"])
 def new():
     msg = ""
     if request.method == "POST":
         f = request.form; g = lambda k, d="": f.get(k, d).strip()
-        jid = "j" + secrets.token_hex(6); jdir = os.path.join(CONF, "jobs"); os.makedirs(jdir, exist_ok=True)
-        jf = os.path.join(jdir, jid + ".log"); open(jf, "w").write("run|Starting\n")
-        args = [EMAD, "api", "create", g("name"), g("type"), g("role"), g("local"), g("remote"), g("ports") or "1", g("cport") or "0", g("token"), g("idx"), g("peer")]
-        subprocess.Popen(args, env=dict(os.environ, EMAD_JOB=jf), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
-        return redirect("/job/" + jid)
+        if g("mode") == "pair":
+            BH = ("tcp", "tcpudp", "udp", "tcpmux", "ws", "wsmux", "wss")
+            t1 = g("t1") if g("t1") in BH else "tcp"; t2 = g("t2") if g("t2") in BH else ""
+            base = g("name"); cp = int(g("cport") or 33001); specs = []
+            if g("role") == "foreign":
+                if t1: specs.append((base + "-" + t1, "backhaul-" + t1, "1", cp))
+                if t2 and t2 != t1: specs.append((base + "-" + t2, "backhaul-" + t2, "1", cp + 1))
+            else:
+                if g("tcp_ports"): specs.append((base + "-" + t1, "backhaul-" + t1, g("tcp_ports"), cp))
+                if g("udp_ports") and t2: specs.append((base + "-" + t2, "backhaul-" + t2, g("udp_ports"), cp + 1))
+            if not specs: msg = "Enter at least one port group."
+            else:
+                for n, typ, ports, c in specs: start_job(n, typ, g("role"), g("local"), g("remote"), ports, c, g("token"), g("idx"), "")
+                return redirect("/tun?m=" + str(len(specs)) + " tunnel(s) started. Check the list below.")
+        else:
+            jid = start_job(g("name"), g("type"), g("role"), g("local"), g("remote"), g("ports") or "1", g("cport") or "0", g("token"), g("idx"), g("peer"))
+            return redirect("/job/" + jid)
     body = R("""<h1 class="serif">New tunnel</h1><p class="sub">Run this form on both servers. Use the same ID, control port and token on each side.</p>
 <form method="post" class="grid"><input type="hidden" name="t" value="{{csrf()}}">
-<div style="grid-column:1/-1"><label>Tunnel type (70 types, grouped)</label><select name="type" required>{% for g in groups %}<optgroup label="{{g}}">{% for c in cat if c[3]==g %}<option value="{{c[0]}}">{{c[1]}}  -  {{c[2]}}</option>{% endfor %}</optgroup>{% endfor %}</select></div>
+<div><label>Mode</label><select id="md" name="mode"><option value="single">Single tunnel</option><option value="pair">TCP + UDP pair</option></select></div>
+<div class="pr" style="display:none"><label>Group 1 transport (Backhaul)</label><select name="t1"><option value="tcp">tcp</option><option value="tcpudp">tcpudp</option><option value="tcpmux">tcpmux</option><option value="udp">udp</option><option value="ws">ws</option><option value="wsmux">wsmux</option><option value="wss">wss</option></select></div>
+<div class="pr" style="display:none"><label>Group 2 transport (Backhaul, optional)</label><select name="t2"><option value="">none</option><option value="tcp">tcp</option><option value="tcpudp">tcpudp</option><option value="tcpmux">tcpmux</option><option value="udp">udp</option><option value="ws">ws</option><option value="wsmux">wsmux</option><option value="wss">wss</option></select></div>
+<div class="pr" style="display:none"><label>Group 1 ports (e.g. 443,80)</label><input name="tcp_ports" placeholder="443,80"></div>
+<div class="pr" style="display:none"><label>Group 2 ports (e.g. 2000-2100)</label><input name="udp_ports" placeholder="2000-2100"></div>
+
+<div id="tyw" style="grid-column:1/-1"><label>Tunnel type (42 types, grouped)</label><select name="type" required>{% for g in groups %}<optgroup label="{{g}}">{% for c in cat if c[3]==g %}<option value="{{c[0]}}">{{c[1]}}  -  {{c[2]}}</option>{% endfor %}</optgroup>{% endfor %}</select></div>
 <div><label>Name</label><input name="name" pattern="[a-z0-9_-]{1,24}" placeholder="t1" required></div>
 <div><label>This server is</label><select id="rl" name="role"><option value="iran">ایران (ورودی، پورت‌ها اینجا)</option><option value="foreign">خارج (خروجی، پورت لازم نیست)</option></select></div>
 <div><label>This server IP</label><input name="local" value="{{ip}}" required></div><div><label>Other server IP</label><input name="remote" required></div>
@@ -571,12 +596,17 @@ def new():
 <div><label>Control port (proxy-based types)</label><input name="cport" type="number" value="33001"></div><div><label id="tl">Token</label><div class="row" style="flex-wrap:nowrap"><input id="ti" name="token" value="{{tok}}" autocomplete="off" style="font-family:ui-monospace,Consolas,monospace"><button type="button" class="btn sm" id="tc">Copy</button></div><small id="th" style="color:#85857f"></small></div>
 <div><label>WireGuard peer public key (optional)</label><input name="peer"></div>
 <div style="align-self:end"><button class="btn red" style="padding:12px 22px">Create and start</button></div></form><script>
-const rl=document.getElementById("rl"),pw=document.getElementById("pw"),ti=document.getElementById("ti"),tl=document.getElementById("tl"),th=document.getElementById("th"),tc=document.getElementById("tc");
+const rl=document.getElementById("rl"),pw=document.getElementById("pw"),ti=document.getElementById("ti"),tl=document.getElementById("tl"),th=document.getElementById("th"),tc=document.getElementById("tc"),md=document.getElementById("md"),tyw=document.getElementById("tyw");
 const TOK=ti.value;
-function sw(){const f=rl.value=="foreign";pw.style.display=f?"none":"";
- if(f){ti.value="";ti.placeholder="Paste the token from the Iran server";ti.required=true;tl.textContent="Token from the Iran server";th.textContent="Paste the token that the Iran server created. It must match exactly.";tc.style.display="none";}
- else{ti.value=TOK;ti.required=true;tl.textContent="Token (create on this Iran server, then copy it to the foreign server)";th.textContent="Shown once here. Copy it now and paste it on the foreign server.";tc.style.display="";}}
-rl.onchange=sw;sw();
+function sw(){const f=rl.value=="foreign",p=md.value=="pair";
+ document.querySelectorAll(".pr").forEach(e=>e.style.display=p?"":"none");
+ tyw.style.display=p?"none":"";
+ pw.style.display=(f||p)?"none":"";
+ if(f){ti.value="";ti.placeholder="Paste the token from the Iran server";tl.textContent="Token from the Iran server";th.textContent="Paste the token that the Iran server created. It must match exactly.";tc.style.display="none";}
+ else{ti.value=TOK;tl.textContent="Token (create on this Iran server, then copy it to the foreign server)";th.textContent="Shown once here. Copy it now and paste it on the foreign server.";tc.style.display="";}
+ if(p&&!f){document.querySelector('[name=which]').closest(".pr").style.display="none";}
+}
+rl.onchange=sw;md.onchange=sw;sw();
 tc.onclick=()=>{navigator.clipboard&&navigator.clipboard.writeText(ti.value);tc.textContent="Copied";setTimeout(()=>tc.textContent="Copy",1500)};
 </script>""", cat=catalog(), groups=sorted({c[3] for c in catalog()}), ip=emad("ip"), tok="".join(secrets.choice(string.ascii_letters + string.digits) for _ in range(40)))
     return page("new", body, msg)

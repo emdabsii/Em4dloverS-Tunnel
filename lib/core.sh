@@ -25,10 +25,12 @@ frp-kcp|FRP KCP|Reverse proxy, KCP|FRP
 frp-quic|FRP QUIC|Reverse proxy, QUIC|FRP
 frp-websocket|FRP WebSocket|Reverse proxy, WebSocket|FRP
 backhaul-tcp|Backhaul TCP|Reverse tunnel, TCP|Backhaul
+backhaul-tcpudp|Backhaul TCP+UDP|One port carries TCP and UDP (accept_udp)|Backhaul
 backhaul-tcpmux|Backhaul TCPMux|Reverse tunnel, TCPMux|Backhaul
 backhaul-udp|Backhaul UDP|Reverse tunnel, UDP|Backhaul
 backhaul-ws|Backhaul WS|Reverse tunnel, WS|Backhaul
 backhaul-wsmux|Backhaul WSMux|Reverse tunnel, WSMux|Backhaul
+backhaul-wss|Backhaul WSS|WebSocket over TLS (self-signed ECDSA P-384 cert)|Backhaul
 rathole|Rathole TCP|Reverse tunnel in Rust, very fast|Rathole
 gost-tcp|GOST relay TCP|GOST relay protocol over TCP|GOST relay
 gost-tls|GOST relay+TLS|GOST relay protocol over TLS|GOST relay
@@ -53,11 +55,12 @@ gosts-h2|GOST SOCKS5+H2|GOST SOCKS5 over H2|GOST SOCKS5
 gosts-h2c|GOST SOCKS5+H2C|GOST SOCKS5 over H2C|GOST SOCKS5
 gosts-quic|GOST SOCKS5+QUIC|GOST SOCKS5 over QUIC|GOST SOCKS5
 gosts-kcp|GOST SOCKS5+KCP|GOST SOCKS5 over KCP|GOST SOCKS5
-gosts-grpc|GOST SOCKS5+gRPC|GOST SOCKS5 over gRPC|GOST SOCKS5'
-REVERSE_RX='^(rathole|backhaul-.*|frp-.*|chisel.*)$'
+gosts-grpc|GOST SOCKS5+gRPC|GOST SOCKS5 over gRPC|GOST SOCKS5
+rathole-udp|Rathole UDP|Reverse tunnel, UDP services (untested on servers)|Rathole'
+REVERSE_RX='^(rathole.*|backhaul-.*|frp-.*|chisel.*)$'
 
 engine_of(){ case $1 in gre|gretap|ipip|vxlan|geneve|gre6|gre6tap|ipip6|dnat|*-fou|*-gue) echo kernel;; wg|wg-psk|wg-1280) echo wg;; socat-*) echo socat;;
-  haproxy) echo haproxy;; gost-*|gosts-*) echo gost;; rathole) echo rathole;; backhaul-*) echo backhaul;; frp-*) echo frp;; chisel|chisel-tls) echo chisel;; hy2|hy2-obfs) echo hysteria;; xray-*) echo xray;; esac; }
+  haproxy) echo haproxy;; gost-*|gosts-*) echo gost;; rathole|rathole-udp) echo rathole;; backhaul-*) echo backhaul;; frp-*) echo frp;; chisel|chisel-tls) echo chisel;; hy2|hy2-obfs) echo hysteria;; xray-*) echo xray;; esac; }
 type_name(){ echo "$CATALOG" | awk -F'|' -v t="$1" '$1==t{print $2}'; }
 
 # ---------- system ----------
@@ -77,4 +80,3 @@ port_free(){ ! ss -tuln 2>/dev/null | awk '{print $5}' | grep -qE "[:.]$1$"; }
 rand_port(){ local p; while :; do p=$(shuf -i 10000-60000 -n1); port_free "$p" && { echo "$p"; return; }; done; }
 rand_token(){ tr -dc "A-Za-z0-9" </dev/urandom | head -c 40; }
 rand_str(){ tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-16}"; }
-

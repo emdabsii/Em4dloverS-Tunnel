@@ -61,16 +61,31 @@ gen_gost(){ local fam=${TYPE%%-*} t=${TYPE#*-} base=relay sch a="" p; [ "$fam" =
   if [ "$ROLE" = foreign ]; then echo "  exec gost -L \"$sch://emad:$TOKEN@:$CPORT\" ;;"
   else for p in $(port_list); do a+=" -L tcp://:$p/127.0.0.1:$p"; done
        echo "  exec gost$a -F \"$sch://emad:$TOKEN@$REMOTE:$CPORT\" ;;"; fi; echo 'esac'; }
-gen_rathole(){ local f=$CFG/$NAME.toml p; echo 'case $1 in start)'
+gen_rathole(){ local f=$CFG/$NAME.toml p ty=""; [ "$TYPE" = rathole-udp ] && ty='udp'; echo 'case $1 in start)'
   if [ "$ROLE" = iran ]; then { printf '[server]\nbind_addr = "0.0.0.0:%s"\ndefault_token = "%s"\n' "$CPORT" "$TOKEN"
-      for p in $(port_list); do printf '[server.services.p%s]\nbind_addr = "0.0.0.0:%s"\n' "$p" "$p"; done; } >"$f"
+      for p in $(port_list); do printf '[server.services.p%s]\nbind_addr = "0.0.0.0:%s"\n%s\n' "$p" "$p" "${ty:+type = \"$ty\"}"; done; } >"$f"
   else { printf '[client]\nremote_addr = "%s:%s"\ndefault_token = "%s"\n' "$REMOTE" "$CPORT" "$TOKEN"
-      for p in $(port_list); do printf '[client.services.p%s]\nlocal_addr = "127.0.0.1:%s"\n' "$p" "$p"; done; } >"$f"; fi
+      for p in $(port_list); do printf '[client.services.p%s]\nlocal_addr = "127.0.0.1:%s"\n%s\n' "$p" "$p" "${ty:+type = \"$ty\"}"; done; } >"$f"; fi
   chmod 600 "$f"; echo "  exec rathole $f ;;"; echo 'esac'; }
-gen_backhaul(){ local f=$CFG/$NAME.toml tr=${TYPE#backhaul-} t pl=""; echo 'case $1 in start)'
-  if [ "$ROLE" = iran ]; then for t in $(port_tokens); do pl+="\"$t\", "; done
-    printf '[server]\nbind_addr = "0.0.0.0:%s"\ntransport = "%s"\ntoken = "%s"\nnodelay = true\nkeepalive_period = 75\nlog_level = "info"\nports = [%s]\n' "$CPORT" "$tr" "$TOKEN" "${pl%, }" >"$f"
-  else printf '[client]\nremote_addr = "%s:%s"\ntransport = "%s"\ntoken = "%s"\nnodelay = true\nkeepalive_period = 75\nlog_level = "info"\n' "$REMOTE" "$CPORT" "$tr" "$TOKEN" >"$f"; fi
+gen_backhaul(){ local f=$CFG/$NAME.toml tr=${TYPE#backhaul-} t pl="" extra="" tune="" udp=0
+  [ "$tr" = tcpudp ] && { tr=tcp; udp=1; }
+  echo 'case $1 in start)'
+  # tuned options for tcp, tcp+udp and wss; other transports keep the basic set
+  if [ "$tr" = tcp ] || [ "$tr" = wss ]; then
+    if [ "$ROLE" = iran ]; then tune=$'keepalive_period = 10\nnodelay = true\nheartbeat = 15\nchannel_size = 4096\nmss = 1360\nso_rcvbuf = 4194304\nso_sndbuf = 4194304\nsniffer = false\n'
+    else tune=$'connection_pool = 64\naggressive_pool = true\nkeepalive_period = 10\ndial_timeout = 5\nnodelay = true\nretry_interval = 1\nmss = 1360\nso_rcvbuf = 4194304\nso_sndbuf = 4194304\nsniffer = false\n'; fi
+  else tune=$'nodelay = true\nkeepalive_period = 75\n'; fi
+  if [ "$ROLE" = iran ]; then
+    for t in $(port_tokens); do pl+="\"$t\", "; done
+    [ $udp = 1 ] && extra=$'accept_udp = true\n'
+    if [ "$tr" = wss ]; then
+      [ -f "$CFG/$NAME.crt" ] || { openssl ecparam -name secp384r1 -genkey -noout -out "$CFG/$NAME.key" 2>/dev/null; openssl req -new -x509 -sha384 -key "$CFG/$NAME.key" -out "$CFG/$NAME.crt" -days 3650 -subj "/CN=em4d" 2>/dev/null; chmod 600 "$CFG/$NAME.key"; }
+      extra+=$'tls_cert = "'"$CFG/$NAME.crt"$'"\ntls_key = "'"$CFG/$NAME.key"$'"\n'
+    fi
+    printf '[server]\nbind_addr = "0.0.0.0:%s"\ntransport = "%s"\n%stoken = "%s"\n%slog_level = "info"\nports = [%s]\n' "$CPORT" "$tr" "$extra" "$TOKEN" "$tune" "${pl%, }" >"$f"
+  else
+    printf '[client]\nremote_addr = "%s:%s"\ntransport = "%s"\ntoken = "%s"\n%slog_level = "info"\n' "$REMOTE" "$CPORT" "$tr" "$TOKEN" "$tune" >"$f"
+  fi
   chmod 600 "$f"; echo "  exec backhaul -c $f ;;"; echo 'esac'; }
 gen_frp(){ local pr=${TYPE#frp-} f p; echo 'case $1 in start)'
   if [ "$ROLE" = iran ]; then f=$CFG/$NAME.frps.toml
@@ -122,7 +137,7 @@ gen_xray(){ local f=$CFG/$NAME.json k=${TYPE#xray-} proto net m="" st h u ss sc 
 
 gen_run(){ local f=$RUN/$NAME.sh; SVC=simple
   { echo '#!/bin/bash'; echo "# Em4dloverS tunnel: $NAME ($TYPE, $ROLE)"
-    case $TYPE in gre|gretap|ipip|vxlan|geneve|gre6|gre6tap|ipip6|*-fou|*-gue|wg|wg-psk|wg-1280|dnat) SVC=oneshot; gen_kernel;; gost-*|gosts-*) gen_gost;; rathole) gen_rathole;;
+    case $TYPE in gre|gretap|ipip|vxlan|geneve|gre6|gre6tap|ipip6|*-fou|*-gue|wg|wg-psk|wg-1280|dnat) SVC=oneshot; gen_kernel;; gost-*|gosts-*) gen_gost;; rathole|rathole-udp) gen_rathole;;
       backhaul-*) gen_backhaul;; frp-*) gen_frp;; chisel|chisel-tls) gen_chisel;; socat-*) gen_socat;; haproxy) gen_haproxy;; hy2|hy2-obfs) gen_hysteria;; xray-*) gen_xray;; esac; } >"$f"
   chmod 700 "$f"; }
 write_unit(){ local u="$UNITDIR/emad-$NAME.service"; mkdir -p "$UNITDIR"
